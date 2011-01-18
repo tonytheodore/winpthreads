@@ -100,7 +100,7 @@ mythread(void * arg)
   int result;
 
   assert(pthread_mutex_lock(&mutex1) == 0);
-  ++waiting;
+  InterlockedIncrement((long*)&waiting);
   assert(pthread_mutex_unlock(&mutex1) == 0);
   assert(pthread_cond_signal(&cv1) == 0);
 
@@ -108,11 +108,11 @@ mythread(void * arg)
   result = pthread_cond_timedwait(&cv, &mutex, &abstime);
   if (result == ETIMEDOUT)
     {
-      timedout++;
+      InterlockedIncrement((long*)&timedout);
     }
-  else
+  else if (result == 0)
     {
-      awoken++;
+      InterlockedIncrement((long*)&awoken);
     }
   assert(pthread_mutex_unlock(&mutex) == 0);
 
@@ -139,7 +139,7 @@ main()
   abstime.tv_sec = currSysTime.time;
   abstime.tv_nsec = NANOSEC_PER_MILLISEC * currSysTime.millitm;
 
-  abstime.tv_sec += 5;
+  abstime.tv_sec += 10;
 
   assert(pthread_mutex_lock(&mutex1) == 0);
 

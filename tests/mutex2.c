@@ -49,16 +49,20 @@ int
 main()
 {
   assert(mutex == PTHREAD_MUTEX_INITIALIZER);
+  fprintf (stderr, "Try lock\n");
 
   assert(pthread_mutex_lock(&mutex) == 0);
+  fprintf(stderr, "Mutex locked\n");
 
   assert(mutex != PTHREAD_MUTEX_INITIALIZER);
 
   assert(mutex != NULL);
 
   assert(pthread_mutex_unlock(&mutex) == 0);
+  fprintf(stderr, "Mutex unlocked\n");
 
   assert(pthread_mutex_destroy(&mutex) == 0);
+  fprintf(stderr, "Mutex destroyed\n");
 
   assert(mutex == NULL);
 
