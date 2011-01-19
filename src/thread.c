@@ -25,9 +25,9 @@ static void push_pthread_mem(_pthread_v *sv)
   int x;
   if (!sv || sv->next != NULL)
     return;
+  _spin_lite_lock(&spin_pthr_locked);
   x = sv->x + 1;
   memset (sv, 0, sizeof(struct _pthread_v));
-  _spin_lite_lock(&spin_pthr_locked);
   if (pthr_last == NULL)
     pthr_root = pthr_last = sv;
   else
@@ -621,15 +621,51 @@ int pthread_set_concurrency(int val)
 
 int pthread_exit(void *res)
 {
-    pthread_t t = pthread_self();
-    if (t.p == NULL)
+    _pthread_v *t = NULL;
+    unsigned rslt = (unsigned) ((intptr_t) res);
+    pthread_t tp = pthread_self();
+    if (tp.p == NULL)
       return EINVAL;
 
-    t.p->ret_arg = res;
+    tp.p->ret_arg = res;
 
-    _pthread_cleanup_dest(t);
+    _pthread_cleanup_dest(tp);
+    if (tp.p->thread_noposix == 0)
+      longjmp(tp.p->jb, 1);
 
-    longjmp(t.p->jb, 1);
+    /* Make sure we free ourselves if we are detached */
+    t = (_pthread_v *)TlsGetValue(_pthread_tls);
+    if (t)
+    {
+      if (!t->h) {
+	  t->valid = DEAD_THREAD;
+	  if (t->evStart)
+	    CloseHandle(t->evStart);
+	  t->evStart = NULL;
+	  rslt = (unsigned) (size_t) t->ret_arg;
+	  push_pthread_mem(t);
+	  t = NULL;
+	  TlsSetValue(_pthread_tls, t);
+      } else
+      {
+	rslt = (unsigned) (size_t) t->ret_arg;
+	t->ended = 1;
+	if (t->evStart)
+	  CloseHandle(t->evStart);
+	t->evStart = NULL;
+	if ((t->p_state & PTHREAD_CREATE_DETACHED) == PTHREAD_CREATE_DETACHED)
+	{
+	  t->valid = DEAD_THREAD;
+	  CloseHandle (t->h);
+	  t->h = NULL;
+	  push_pthread_mem(t);
+	  t = NULL;
+	  TlsSetValue(_pthread_tls, t);
+	}
+      }
+    }
+    /* Time to die */
+    _endthreadex(rslt);
 }
 
 void _pthread_invoke_cancel(void)
@@ -675,15 +711,17 @@ void _pthread_setnobreak(int v)
 void pthread_testcancel(void)
 {
   pthread_t self = pthread_self();
-  if (!self.p)
+  if (!self.p || self.p->in_cancel)
     return;
   if (!_pthread_cancelling)
     return;
   pthread_mutex_lock(&self.p->p_clock);
   if (self.p->cancelled && (self.p->p_state & PTHREAD_CANCEL_ENABLE) && self.p->nobreak <= 0)
   {
+    self.p->in_cancel = 1;
     self.p->p_state &= ~PTHREAD_CANCEL_ENABLE;
-    ResetEvent(self.p->evStart);
+    if (self.p->evStart)
+      ResetEvent(self.p->evStart);
     pthread_mutex_unlock(&self.p->p_clock);
     _pthread_invoke_cancel();
   }
@@ -774,11 +812,17 @@ int pthread_cancel(pthread_t t)
 /* half-stubbed version as we don't really well support signals */
 int pthread_kill(pthread_t t, int sig)
 {
-    struct _pthread_v *tv = t.p;
+    struct _pthread_v *tv;
 
-    if (!tv) return ESRCH;
-    CHECK_OBJECT(tv, ESRCH);
-    if (tv->ended) return ESRCH;
+    _spin_lite_lock(&spin_pthr_locked);
+    tv = t.p;
+    if (!tv || t.x != tv->hlp.x || tv->in_cancel || tv->ended || tv->h == NULL ||
+        tv->h == INVALID_HANDLE_VALUE)
+    {
+      _spin_lite_unlock(&spin_pthr_locked);
+      return ESRCH;
+    }
+    _spin_lite_unlock(&spin_pthr_locked);
     if (!sig) return 0;
     if (sig < SIGINT || sig > NSIG) return EINVAL;
     return pthread_cancel(t);
@@ -997,7 +1041,6 @@ int pthread_create(pthread_t *th, const pthread_attr_t *attr, void *(* func)(voi
     tv->h = INVALID_HANDLE_VALUE;
     tv->evStart = CreateEvent (NULL, 1, 0, NULL);
     tv->p_clock = PTHREAD_MUTEX_INITIALIZER;
-    //tv->tmpEv = CreateEvent (NULL, 1, 0, NULL);
     tv->valid = LIFE_THREAD;
     tv->sched.sched_priority = THREAD_PRIORITY_NORMAL;
     tv->sched_pol = SCHED_OTHER;
