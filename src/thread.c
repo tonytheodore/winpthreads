@@ -739,7 +739,10 @@ int pthread_cancel(pthread_t t)
     pthread_mutex_lock(&t.p->p_clock);
     if (pthread_equal(pthread_self(), t))
     {
-      if(tv->cancelled) return (tv->in_cancel ? ESRCH : 0);
+      if(tv->cancelled) {
+        pthread_mutex_unlock(&t.p->p_clock);
+        return (tv->in_cancel ? ESRCH : 0);
+      }
       tv->cancelled = 1;
       InterlockedIncrement(&_pthread_cancelling);
       if(tv->evStart) SetEvent(tv->evStart);
@@ -758,6 +761,11 @@ int pthread_cancel(pthread_t t)
     {
         /* Dangerous asynchronous cancelling */
         CONTEXT ctxt;
+
+	if(tv->in_cancel) {
+	  pthread_mutex_unlock(&t.p->p_clock);
+	  return (tv->in_cancel ? ESRCH : 0);
+	}
 
         /* Already done? */
         if(tv->cancelled || tv->in_cancel) return ESRCH;
