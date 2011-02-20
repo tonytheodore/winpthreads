@@ -30,8 +30,10 @@
 
 #endif
 
-#define UINT2PTR(x)								((void *)(uintptr_t)(x))
-#define PTR2INT(x)								((int)(uintptr_t)(x))
+#ifndef UINT2PTR
+#define UINT2PTR(x)	((void *)(uintptr_t)(x))
+#endif
+#define PTR2INT(x)	((int)(uintptr_t)(x))
 
 #if SIZE_MAX>UINT_MAX
 typedef long long LONGBAG;
