@@ -268,6 +268,10 @@ typedef void	*pthread_barrier_t;
 #define PTHREAD_MUTEX_ERRORCHECK 1
 #define PTHREAD_MUTEX_RECURSIVE 2
 
+#ifndef UINT2PTR
+#define UINT2PTR(VAL)	((void *) ((size_t) (VAL)))
+#endif
+
 #define GENERIC_INITIALIZER				UINT2PTR(-1)
 #define GENERIC_ERRORCHECK_INITIALIZER			UINT2PTR(-2)
 #define GENERIC_RECURSIVE_INITIALIZER			UINT2PTR(-3)
