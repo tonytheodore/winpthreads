@@ -91,7 +91,20 @@ main()
       once[j] = o;
 
       for (i = 0; i < NUM_THREADS; i++)
-        assert(pthread_create(&t[i][j], NULL, mythread, (void *) (size_t) j) == 0);
+      { int rslt1;
+        rslt1 = pthread_create(&t[i][j], NULL, mythread, (void *) (size_t) j);
+	if (rslt1 == EAGAIN)
+	{
+	  Sleep (0);
+	  i--;
+	  continue;
+	}
+        if (rslt1 != 0)
+        {
+	  fprintf (stderr, "%d has result %d (EAGAIN:%d)\n", j, rslt1, EAGAIN);
+	  assert (rslt1 != 0);
+        }
+      }
     }
 
   for (j = 0; j < NUM_ONCE; j++)

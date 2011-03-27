@@ -175,10 +175,13 @@ main()
 
       for (i = 0; i < NUM_THREADS; i++)
         {
+	  int r1;
 	  bag_t * bag = &threadbag[i][j];
 	  bag->threadnum = i;
 	  bag->oncenum = j;
-          assert(pthread_create(&t[i][j], NULL, mythread, (void *) bag) == 0);
+          r1 = pthread_create(&t[i][j], NULL, mythread, (void *) bag);
+	  if (r1 == EAGAIN) { --i; Sleep(0); continue; }
+	  assert (r1 == 0);
         }
     }
 

@@ -110,7 +110,12 @@ main()
 
       for (i = 0; i < NUM_THREADS; i++)
         {
-          assert(pthread_create(&t[i][j], NULL, mythread, (void *) (size_t) j) == 0);
+	  int r1 =
+            pthread_create(&t[i][j], NULL, mythread, (void *) (size_t) j);
+	  if (r1 == EAGAIN) { --i; Sleep(0); continue; }
+	  if (r1 != 0)
+	  fprintf (stderr, "create returns %d (EAGAIN:%d)\n",r1, EAGAIN);
+	  assert (r1 == 0);
         }
     }
 

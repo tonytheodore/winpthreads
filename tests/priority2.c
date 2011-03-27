@@ -163,6 +163,7 @@ main()
 	  validPriorities[param.sched_priority+(PTW32TEST_MAXPRIORITIES/2)]);
       pthread_join(t, &result);
       assert(param.sched_priority == (int) (size_t) result);
+      fprintf (stderr, ".");
     }
 
   return 0;
