@@ -99,7 +99,7 @@ main()
   _ftime(&currSysTime);
 
   abstime.tv_sec = currSysTime.time;
-  abstime.tv_nsec = NANOSEC_PER_MILLISEC * currSysTime.millitm;
+  abstime.tv_nsec = (long) (1000000ULL * (unsigned long long) currSysTime.millitm);
 
   abstime.tv_sec += 1;
 
