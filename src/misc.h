@@ -61,7 +61,11 @@ typedef long LONGBAG;
 #define VALID(x)    if (!(p)) return EINVAL;
 
 /* ms can be 64 bit, solve wrap-around issues: */
-#define dwMilliSecs(ms)		((ms) >= INFINITE ? INFINITE : (DWORD)(ms))
+static inline unsigned long dwMilliSecs(unsigned long long ms)
+{
+  if (ms >= 0xffffffffULL) return 0xfffffffful;
+  return (unsigned long) ms;
+}
 
 #ifndef _mm_pause
 #define _mm_pause()			{__asm__ __volatile__("pause");}

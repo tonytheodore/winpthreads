@@ -4,10 +4,6 @@
 #define LIFE_RWLOCK 0xBAB1F0ED
 #define DEAD_RWLOCK 0xDEADB0EF
 
-#undef USE_RWLOCK_SRWLock
-#undef USE_RWLOCK_pthread_cond
-#define USE_RWLOCK_pthread_cond 1
-
 #define INIT_RWLOCK(rwl)  { int r; \
     if (STATIC_RWL_INITIALIZER(*rwl)) { if ((r = rwlock_static_init(rwl))) { if (r != EBUSY) return r; }}}
 

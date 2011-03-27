@@ -56,55 +56,6 @@ extern "C" {
 /* Compatibility stuff: */
 #define RWLS_PER_THREAD						8
 
-/* contention analysis, etc: */
-#define USE_SPINLOCK_DBG					1
-/* deadlock detection is optional for spinlocks */
-#define USE_SPINLOCK_DEADLK					1
-/* checking if de calling thread holds the lock at unlock is optional */
-#define USE_SPINLOCK_EPERM					1
-/* Set this to 0 to disable it */
-#define USE_MUTEX_CriticalSection_SpinCount	0
-
-/* A few ways to implement pthread_mutex:  */
-//#define USE_MUTEX_Mutex 1
-/* Faster than Mutex but NOT cross-process.  */
-#define USE_MUTEX_CriticalSection 1
-
-/* A few ways to implement pthread_cond:  */
-/* default.  */
-#define USE_COND_Semaphore 1
-/* USE_COND_SignalObjectAndWait has a flaw at timeout, hopefully fixed.  */
-//#define USE_COND_SignalObjectAndWait 1
-/* USE_COND_ConditionVariable is Windows Vista+, NOT cross-process.  */
-//#define USE_COND_ConditionVariable 1
-
-/* A few ways to implement pthread_rwlock:  */
-/* default, use pthread_cond above.  */
-#define USE_RWLOCK_pthread_cond 1
-/* USE_RWLOCK_SRWLock is Windows Vista+, NOT cross-process.  */
-//#define USE_RWLOCK_SRWLock 1
-
-/* Experimental, use a synchronization object for timed waits:  */
-//#define USE_RWLOCK_SRWLock_Sync 1
-
-/* Dependencies:  */
-#ifdef USE_SPINLOCK_EPERM /* need the owner */
-#undef USE_SPINLOCK_DEADLK
-#define USE_SPINLOCK_DEADLK 1
-#endif
-
-#ifdef USE_COND_SignalObjectAndWait
-#undef USE_MUTEX_CriticalSection
-#undef USE_MUTEX_Mutex
-#define USE_MUTEX_Mutex	1
-#endif
-
-#ifdef USE_COND_ConditionVariable
-#undef USE_MUTEX_CriticalSection
-#undef USE_MUTEX_Mutex
-#define USE_MUTEX_CriticalSection	1
-#endif
-
 /* Error-codes.  */
 #define ETIMEDOUT	110
 #define ENOTSUP		134
@@ -129,7 +80,7 @@ extern "C" {
 
 #define PTHREAD_DEFAULT_ATTR (PTHREAD_CANCEL_ENABLE)
 
-#define PTHREAD_CANCELED ((void *) 0xDEADBEEF)
+#define PTHREAD_CANCELED ((void *) (intptr_t) 0xDEADBEEF)
 
 #define _PTHREAD_NULL_THREAD { NULL, 0 }
 
@@ -187,7 +138,9 @@ typedef unsigned pthread_key_t;
 typedef void *pthread_barrierattr_t;
 typedef int pthread_condattr_t;
 typedef int pthread_rwlockattr_t;
+
 struct _pthread_v;
+
 typedef struct pthread_t {
   struct _pthread_v *p;
   int x;

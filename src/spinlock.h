@@ -6,27 +6,17 @@
         || ( ((spin_t *)(*l))->valid != (unsigned int)LIFE_SPINLOCK ) ) \
         return EINVAL; }
 
-#undef USE_SPINLOCK_DEADLK
 #define CHECK_DEADLK_SL(l)
 #define SET_OWNER_SL(l)	
 #define SET_OWNER_SLIF(l,r)	
 #define UNSET_OWNER_SL(l)
 
-#ifdef USE_SPINLOCK_DBG
 #define CHECK_SPINLOCK_LITE(l) if (!(l)) return EINVAL;
 #define _spin_lite_lock_cnt(c)	c++
 #define _spin_lite_lock_inc(c)	InterlockedIncrement(&c)
 #define _spin_lite_lock_dec(c)	InterlockedDecrement(&c)
 #define _spin_lite_lock_stat(c)	{scntMax = (c > scntMax) ? c : scntMax;	scnt += lscnt;}
-#else
-#define CHECK_SPINLOCK_LITE(l)
-#define _spin_lite_lock_cnt(c)
-#define _spin_lite_lock_inc(c)
-#define _spin_lite_lock_stat(c)
-#define _spin_lite_lock_dec(c)
-#endif
 
-#undef USE_SPINLOCK_EPERM
 #define CHECK_PERM_SL(l)
 
 #define INIT_SPINLOCK(s)  { int r; \

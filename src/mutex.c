@@ -208,22 +208,8 @@ static int pthread_mutex_lock_intern(pthread_mutex_t *m, DWORD timeout)
 	  return mutex_unref(m, EDEADLK);
 	}
       }
-    } else {
-#if !defined USE_MUTEX_Mutex
-      if (COND_OWNER(_m))
-      {
-	do {
-	  Sleep(0); /* waiter that owner gets released.  */
-	} while (COND_OWNER(_m));
-      }
-#endif
     }
-#if defined USE_MUTEX_Mutex
     r = do_sema_b_wait_intern (_m->h, 1, timeout);
-#else /* USE_MUTEX_CriticalSection */
-    EnterCriticalSection(&_m->cs.cs);
-    r = 0;
-#endif
     if (r == 0)
     {
       _m->count = 1;
@@ -309,9 +295,6 @@ static inline void _UndoWaitCriticalSection(RTL_CRITICAL_SECTION *prc)
 int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *ts)
 {
     unsigned long long t, ct;
-#ifndef USE_MUTEX_Mutex
-    int i = 0;
-#endif
     int r;
 
     if (!ts) return pthread_mutex_lock(m);
@@ -327,29 +310,9 @@ int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *ts)
       return mutex_unref(m,EDEADLK);
     ct = _pthread_time_in_ms();
     t = _pthread_time_in_ms_from_timespec(ts);
-#ifdef USE_MUTEX_Mutex
    mutex_unref(m,r);
    r = pthread_mutex_lock_intern(m, (ct > t ? 0 : (t - ct)));
-#else
-    mutex_unref(m,EDEADLK);
-    while (1)
-    {
-        /* Have we waited long enough? A high count means we busy-waited probably.*/
-        if (ct >= t) {
-            printf("%d: Timeout after %d times\n",(int)GetCurrentThreadId(), i);
-            return ETIMEDOUT;
-        }
-        if ((i & 1) == 0)
-          Sleep(0);  /* waiter that owner gets released.  */
-        /* Try to grab lock */
-	r = pthread_mutex_trylock(m);
-	if (r != EBUSY) break;
-        /* Get current time */
-        ct = _pthread_time_in_ms();
-        i ++;
-    }
-#endif
-    return  r;
+   return  r;
 }
 
 int pthread_mutex_unlock(pthread_mutex_t *m)
@@ -370,17 +333,12 @@ int pthread_mutex_unlock(pthread_mutex_t *m)
       if(InterlockedDecrement(&_m->count))
 	return mutex_unref(m,0);
     }
-#if defined USE_MUTEX_Mutex
     UNSET_OWNER(_m);
     if (_m->h != NULL && !ReleaseSemaphore(_m->h, 1, NULL)) {
     	SET_OWNER(_m);
         /* restore our own bookkeeping */
         return mutex_unref(m,EPERM);
     }
-#else /* USE_MUTEX_CriticalSection */
-    UNSET_OWNER(_m);
-    LeaveCriticalSection(&_m->cs.cs);
-#endif
     return mutex_unref(m,0);
 }
 
@@ -402,13 +360,9 @@ _mutex_trylock(pthread_mutex_t *m)
       }
     } else if (COND_LOCKED(_m))
       return EBUSY;
-#if defined USE_MUTEX_Mutex
     r = do_sema_b_wait_intern (_m->h, 1, 0);
     if (r == ETIMEDOUT) r = EBUSY;
-#else /* USE_MUTEX_CriticalSection */
-    r = TryEnterCriticalSection(&_m->cs.cs) ? 0 : EBUSY;
-#endif
-    if (!r)
+    else if (!r)
     {
       _m->count = 1;
       SET_OWNER(_m);
@@ -427,23 +381,7 @@ int pthread_mutex_trylock(pthread_mutex_t *m)
 static LONG InitOnce	= 1;
 static void _mutex_init_once(mutex_t *m)
 {
-#if defined USE_MUTEX_CriticalSection
-    LONG lc = 0;
-    EnterCriticalSection(&m->cs.cs);
-    lc = m->cs.rc.LockCount;
-    LeaveCriticalSection(&m->cs.cs);
-    switch (lc) {
-    case 0: /* Win XP + 2k(?) */
-        LockDelta = 1;
-        break;
-    case -2:  /* Win 7 + Vista(?) */
-        LockDelta = -4;
-        break;
-    default:
-        /* give up */
-        assert(FALSE);
-    }
-#endif
+  ;
 }
 
 int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
@@ -466,13 +404,8 @@ int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
         if (!r && share == PTHREAD_PROCESS_SHARED) r = ENOSYS;
     }
     if (!r) {
-#if defined USE_MUTEX_Mutex
-        if ( (_m->h = CreateSemaphore(NULL, 1, 0x7fffffff, NULL)) != NULL) {
-#else /* USE_MUTEX_CriticalSection */
-        if (InitializeCriticalSectionAndSpinCount(&_m->cs.cs, USE_MUTEX_CriticalSection_SpinCount)) {
-#endif
-        } else {
-#if defined USE_MUTEX_Mutex
+        if ((_m->h = CreateSemaphore(NULL, 1, 0x7fffffff, NULL)) == NULL)
+        {
             switch (GetLastError()) {
             case ERROR_ACCESS_DENIED:
                     r = EPERM;
@@ -480,9 +413,6 @@ int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
             default: /* We assume this, to keep it simple: */
                     r = ENOMEM;
             }
-#else /* USE_MUTEX_CriticalSection */
-            r = ENOMEM;
-#endif
         }
     } 
     if (r)
@@ -511,11 +441,7 @@ int pthread_mutex_destroy(pthread_mutex_t *m)
     mutex_t *_m = (mutex_t *)mDestroy;
 
 
-#if defined USE_MUTEX_Mutex
     CloseHandle(_m->h);
-#else /* USE_MUTEX_CriticalSection */
-    DeleteCriticalSection(&_m->cs.cs);
-#endif
     _m->valid = DEAD_MUTEX;
     _m->type  = 0;
     _m->count = 0;

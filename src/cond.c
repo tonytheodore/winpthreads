@@ -405,7 +405,7 @@ int pthread_cond_timedwait(pthread_cond_t *c, pthread_mutex_t *external_mutex, c
     ch.c = _c;
     ch.r = &r;
     ch.external_mutex = external_mutex;
-    
+    { 
     pthread_cleanup_push(cleanup_wait, (void *) &ch);
 
     r = pthread_mutex_unlock(external_mutex);
@@ -413,6 +413,7 @@ int pthread_cond_timedwait(pthread_cond_t *c, pthread_mutex_t *external_mutex, c
       r = do_sema_b_wait (_c->sema_q, 0, dwr,&_c->waiters_q_lock_,&_c->value_q);
 
     pthread_cleanup_pop(1);
+    }
     return r;
 }
 
