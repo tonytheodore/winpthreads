@@ -81,7 +81,7 @@ MAKE	= make -k
 # Mingw32
 #
 XXCFLAGS	= 
-XXLIBS	= -lws2_32 -lgomp
+XXLIBS	= -lws2_32
 CFLAGS	= -O3 -UNDEBUG -Wall $(XXCFLAGS)
 BUILD_DIR	= ..
 INCLUDES	= -I./include
@@ -232,7 +232,7 @@ GC:
 	@ $(CP) $(BUILD_DIR)/$(LIB) .
 	@ $(ECHO) Copying $(BUILD_DIR)/$(DLL)
 	@ $(CP) $(BUILD_DIR)/$(DLL) .
-	$(MAKE) TEST=GC CC=$(CROSS)-gcc XXCFLAGS="-fopenmp -D__CLEANUP_C" all-pass
+	$(MAKE) TEST=GC CC=$(CROSS)-gcc XXCFLAGS="-D__CLEANUP_C" all-pass
 
 GCE:
 	@ $(ECHO) Copying $(BUILD_DIR)/$(LIB)
@@ -491,7 +491,7 @@ benchlib.o: benchlib.c
 	@ $(CC) -c $(CFLAGS) $< $(INCLUDES)
 
 pthread.dll:
-	@ $(ECHO) Preparing loadfree test
+	@ $(ECHO) Preparing loadfree TESTS
 
 clean:
 	- $(RM) *.dll

@@ -65,7 +65,7 @@ main(int argc, char * argv[])
 	/* Create a few threads and then exit. */
 	for (i = 0; i < NUMTHREADS; i++)
 	  {
-	    assert(pthread_create(&id[i], NULL, func, UINT2PTR(i)) == 0);
+	    assert(pthread_create(&id[i], NULL, func, ((void *) (size_t) i)) == 0);
 	  }
 
 	/* Some threads will finish before they are detached, some after. */

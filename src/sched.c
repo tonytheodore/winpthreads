@@ -49,16 +49,18 @@ int pthread_attr_getschedparam(const pthread_attr_t *attr, struct sched_param *p
 
 static int pthread_check(pthread_t t)
 {
+  struct _pthread_v *pv;
   DWORD dwFlags;
-  if (!t.p)
+  if (!t)
     return ESRCH;
-  else if (!(t.p->h) || t.p->h == INVALID_HANDLE_VALUE)
+  pv = __pth_gpointer_locked (t);
+  if (!(pv->h) || pv->h == INVALID_HANDLE_VALUE)
   {
-  	if (t.p->ended == 0)
+  	if (pv->ended == 0)
   	  return 0;
         return ESRCH;
   }
-  else if ((!GetHandleInformation(t.p->h, &dwFlags) && t.p->ended))
+  else if ((!GetHandleInformation(pv->h, &dwFlags) && pv->ended))
         return ESRCH;
   return 0;
 }
@@ -66,7 +68,7 @@ static int pthread_check(pthread_t t)
 int pthread_getschedparam(pthread_t t, int *pol, struct sched_param *p)
 {
     int r;
-    //if (!t.p)
+    //if (!t)
     //  t = pthread_self();
 
     if ((r = pthread_check(t)) != 0)
@@ -78,14 +80,15 @@ int pthread_getschedparam(pthread_t t, int *pol, struct sched_param *p)
     {
         return EINVAL;
     }
-    *pol = t.p->sched_pol;
-    p->sched_priority = t.p->sched.sched_priority;
+    *pol = __pth_gpointer_locked (t)->sched_pol;
+    p->sched_priority = __pth_gpointer_locked (t)->sched.sched_priority;
 
     return 0;
 }
 
 int pthread_setschedparam(pthread_t t, int pol,  const struct sched_param *p)
 {
+  struct _pthread_v *pv;
     int r, pr = 0;
     //if (!t.p) t = pthread_self();
 
@@ -118,10 +121,10 @@ int pthread_setschedparam(pthread_t t, int pol,  const struct sched_param *p)
     } else if (pr >= THREAD_PRIORITY_HIGHEST) {
         pr = THREAD_PRIORITY_HIGHEST;
     }
-
-    if (SetThreadPriority(t.p->h, pr)) {
-        t.p->sched_pol = pol;
-        t.p->sched.sched_priority = p->sched_priority;
+    pv = __pth_gpointer_locked (t);
+    if (SetThreadPriority(pv->h, pr)) {
+        pv->sched_pol = pol;
+        pv->sched.sched_priority = p->sched_priority;
     } else
         r = EINVAL;
     return r;

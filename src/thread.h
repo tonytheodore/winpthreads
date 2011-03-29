@@ -11,7 +11,6 @@
 typedef struct _pthread_v _pthread_v;
 struct _pthread_v
 {
-    pthread_t hlp;
     unsigned int valid;   
     void *ret_arg;
     void *(* func)(void *);
@@ -34,8 +33,13 @@ struct _pthread_v
     struct sched_param sched;
     jmp_buf jb;
     struct _pthread_v *next;
-    int x; /* Internal posix handle.  */
+    pthread_t x; /* Internal posix handle.  */
 };
+
+typedef struct __pthread_idlist {
+  struct _pthread_v *ptr;
+  pthread_t id;
+} __pthread_idlist;
 
 int _pthread_tryjoin(pthread_t t, void **res);
 void _pthread_setnobreak(int);
@@ -44,5 +48,6 @@ void thread_print_set(int state);
 void thread_print(volatile pthread_t t, char *txt);
 #endif
 int  __pthread_shallcancel(void);
+struct _pthread_v *__pth_gpointer_locked (pthread_t id);
 
 #endif

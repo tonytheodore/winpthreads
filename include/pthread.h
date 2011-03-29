@@ -82,7 +82,7 @@ extern "C" {
 
 #define PTHREAD_CANCELED ((void *) (intptr_t) 0xDEADBEEF)
 
-#define _PTHREAD_NULL_THREAD { NULL, 0 }
+#define _PTHREAD_NULL_THREAD ((pthread_t) 0)
 
 #define PTHREAD_ONCE_INIT 0
 
@@ -139,12 +139,16 @@ typedef void *pthread_barrierattr_t;
 typedef int pthread_condattr_t;
 typedef int pthread_rwlockattr_t;
 
+/*
 struct _pthread_v;
 
 typedef struct pthread_t {
   struct _pthread_v *p;
   int x;
 } pthread_t;
+*/
+
+typedef uintptr_t pthread_t;
 
 typedef struct _pthread_cleanup _pthread_cleanup;
 struct _pthread_cleanup
@@ -156,14 +160,14 @@ struct _pthread_cleanup
 
 #define pthread_cleanup_push(F, A)\
 {\
-    const _pthread_cleanup _pthread_cup = {(F), (A), pthread_self().p->clean};\
+    const _pthread_cleanup _pthread_cup = {(F), (A), *pthread_getclean()};\
     _ReadWriteBarrier();\
-    pthread_self().p->clean = (_pthread_cleanup *) &_pthread_cup;\
+    *pthread_getclean() = (_pthread_cleanup *) &_pthread_cup;\
     _ReadWriteBarrier()
 
 /* Note that if async cancelling is used, then there is a race here */
 #define pthread_cleanup_pop(E)\
-    (pthread_self().p->clean = _pthread_cup.next, (E?_pthread_cup.func((pthread_once_t *)_pthread_cup.arg):0));}
+    (*pthread_getclean() = _pthread_cup.next, (E?_pthread_cup.func((pthread_once_t *)_pthread_cup.arg):0));}
 
 /* Windows doesn't have this, so declare it ourselves. */
 #ifndef _TIMESPEC_DEFINED
@@ -224,14 +228,10 @@ typedef void	*pthread_barrier_t;
 #define PTHREAD_MUTEX_ERRORCHECK 1
 #define PTHREAD_MUTEX_RECURSIVE 2
 
-#ifndef UINT2PTR
-#define UINT2PTR(VAL)	((void *) ((size_t) (VAL)))
-#endif
-
-#define GENERIC_INITIALIZER				UINT2PTR(-1)
-#define GENERIC_ERRORCHECK_INITIALIZER			UINT2PTR(-2)
-#define GENERIC_RECURSIVE_INITIALIZER			UINT2PTR(-3)
-#define GENERIC_NORMAL_INITIALIZER			UINT2PTR(-1)
+#define GENERIC_INITIALIZER				((void *) (size_t) -1)
+#define GENERIC_ERRORCHECK_INITIALIZER			((void *) (size_t) -2)
+#define GENERIC_RECURSIVE_INITIALIZER			((void *) (size_t) -3)
+#define GENERIC_NORMAL_INITIALIZER			((void *) (size_t) -1)
 #define PTHREAD_MUTEX_INITIALIZER			(pthread_mutex_t *)GENERIC_INITIALIZER
 #define PTHREAD_RECURSIVE_MUTEX_INITIALIZER		(pthread_mutex_t *)GENERIC_RECURSIVE_INITIALIZER
 #define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER		(pthread_mutex_t *)GENERIC_ERRORCHECK_INITIALIZER
@@ -341,6 +341,11 @@ int pthread_barrierattr_getpshared(void **attr, int *s);
 
 /* Windows has rudimentary signals support.  */
 #define pthread_sigmask(H, S1, S2) 0
+
+/* Private extensions for analysis and internal use.  */
+struct _pthread_cleanup **pthread_getclean (void);
+void *pthread_gethandle (pthread_t t);
+void *pthread_getevent (pthread_t t);
  
 /* Wrap cancellation points.  */
 #ifdef __WINPTRHEAD_ENABLE_WRAP_API

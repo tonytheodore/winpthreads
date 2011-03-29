@@ -108,7 +108,7 @@ Win32thread(void * arg)
    * Doesn't return and doesn't create an implicit POSIX handle.
    */
   printf("result=%d\n",result);
-  pthread_exit(UINT2PTR(result));
+  pthread_exit(((void *) (size_t) result));
 
   return 0;
 }

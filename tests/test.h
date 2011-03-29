@@ -162,7 +162,7 @@ enum ptw32_features {
   PTW32_ALERTABLE_ASYNC_CANCEL              = 0x0002  /* Can cancel blocked threads. */
 };
 
-#define pthread_getw32threadhandle_np(self)     ((self).p->h)
+#define pthread_getw32threadhandle_np(self)     ((HANDLE) pthread_gethandle (self))
 
 /* half-stubbed version */
 int pthread_win32_test_features_np(int mask)
