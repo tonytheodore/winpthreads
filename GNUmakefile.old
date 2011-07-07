@@ -127,7 +127,7 @@ GCE_CFLAGS	= $(PTW32_FLAGS) -mthreads
 
 ## Mingw32
 MAKE		?= make
-CFLAGS	= $(OPT) $(XOPT) -I./include -DHAVE_CONFIG_H -Wall
+CFLAGS	= $(OPT) $(XOPT) -I./include -DHAVE_CONFIG_H -Wall -DIN_WINPTHREAD
 
 STATIC_PTHR_OBJS	= \
                 src/barrier.o \

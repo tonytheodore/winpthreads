@@ -8,6 +8,9 @@
 
 #include <sys/timeb.h>
 
+#ifndef WIN_SCHED_PTHREADS
+#define WIN_SCHED_PTHREADS
+
 #ifndef SCHED_OTHER
 /* Some POSIX realtime extensions, mostly stubbed */
 #define SCHED_OTHER     0
@@ -24,11 +27,21 @@ struct sched_param {
 extern "C" {
 #endif
 
-int sched_yield(void);
-int sched_get_priority_min(int pol);
-int sched_get_priority_max(int pol);
-int sched_getscheduler(pid_t pid);
-int sched_setscheduler(pid_t pid, int pol);
+#if defined DLL_EXPORT && !defined (WINPTHREAD_EXPORT_ALL_DEBUG)
+#ifdef IN_WINPTHREAD
+#define WINPTHREAD_SCHED_API __declspec(dllexport)
+#else
+#define WINPTHREAD_SCHED_API __declspec(dllimport)
+#endif
+#else
+#define WINPTHREAD_SCHED_API
+#endif
+
+int WINPTHREAD_SCHED_API sched_yield(void);
+int WINPTHREAD_SCHED_API sched_get_priority_min(int pol);
+int WINPTHREAD_SCHED_API sched_get_priority_max(int pol);
+int WINPTHREAD_SCHED_API sched_getscheduler(pid_t pid);
+int WINPTHREAD_SCHED_API sched_setscheduler(pid_t pid, int pol);
 
 #ifdef __cplusplus
 }
@@ -40,3 +53,5 @@ int sched_setscheduler(pid_t pid, int pol);
 #define sched_rr_get_interval(_p, _i) \
   ( errno = ENOTSUP, (int) -1 )
 #endif
+
+#endif/*WIN_SCHED_PTHREADS*/
