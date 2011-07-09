@@ -57,7 +57,7 @@ int sem_destroy(sem_t *sem)
   if (!sem || (sv = *sem) == NULL)
     return sem_result(EINVAL);
   if (sem_result(pthread_mutex_lock(&sv->vlock)) != 0)
-    return -1;
+    return sem_result(EINVAL);
   if (sv->value < 0)
   {
     pthread_mutex_unlock(&sv->vlock);
@@ -115,7 +115,7 @@ int sem_trywait(sem_t *sem)
 int sem_wait(sem_t *sem)
 {
   int cur_v;
-  _sem_t *sv;;
+  _sem_t *sv;
 
   if (sem_std_enter (sem, &sv) != 0)
     return -1;
