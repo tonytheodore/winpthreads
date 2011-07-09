@@ -35,7 +35,7 @@ mutex_ref(pthread_mutex_t *m)
     int r = 0;
 
     _spin_lite_lock(&mutex_global);
-    if (!m || IsBasReadPtr (m, sizeof (void *))
+    if (!m || IsBadReadPtr (m, sizeof (void *))
         || !*m)
     {
       _spin_lite_unlock(&mutex_global);
@@ -97,7 +97,7 @@ mutex_ref_destroy(pthread_mutex_t *m, pthread_mutex_t *mDestroy )
     if (_spin_lite_trylock(&mutex_global))
       return EBUSY;
     
-    if (!m || IsBasReadPtr (m, sizeof (void *))
+    if (!m || IsBadReadPtr (m, sizeof (void *))
         || !*m) r = EINVAL;
     else {
         mutex_t *m_ = (mutex_t *)*m;
