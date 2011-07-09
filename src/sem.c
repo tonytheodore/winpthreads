@@ -52,19 +52,23 @@ int sem_init(sem_t *sem, int pshared, unsigned int value)
 
 int sem_destroy(sem_t *sem)
 {
-  _sem_t *sv;;
+  _sem_t *sv = NULL;
+  int sem_state;
 
   if (!sem || (sv = *sem) == NULL)
     return sem_result(EINVAL);
   if (sem_result(pthread_mutex_lock(&sv->vlock)) != 0)
-    return sem_result(EINVAL);
-  if (sv->value < 0)
+    return -1;
+  if (sv->value < 0 || sv->valid == DEAD_SEM)
   {
     pthread_mutex_unlock(&sv->vlock);
     return sem_result(EBUSY);
   }
+  sem_state = sv->valid;
+  sv->valid = DEAD_SEM;
   if (!CloseHandle (sv->s))
   {
+    sv->valid = sem_state;
     pthread_mutex_unlock(&sv->vlock);
     return sem_result(EINVAL);
   }
@@ -83,11 +87,11 @@ static int sem_std_enter(sem_t *sem,_sem_t **svp)
 {
   _sem_t *sv;
   pthread_testcancel();
-  if (!sem || (sv = *sem) == NULL)
+  if (!sem || (sv = *sem) == NULL || sv->valid == DEAD_SEM)
     return sem_result(EINVAL);
   if (sem_result(pthread_mutex_lock(&sv->vlock)) != 0)
     return -1;
-  if (*sem == NULL)
+  if (*sem == NULL || sv->valid == DEAD_SEM)
   {
      pthread_mutex_unlock(&sv->vlock);
      return sem_result(EINVAL);
@@ -130,7 +134,8 @@ int sem_wait(sem_t *sem)
   cur_v = do_sema_b_wait_intern (sv->s, 2, INFINITE);
   if (!cur_v)
     return 0;
-  if (*sem != NULL && pthread_mutex_lock(&sv->vlock) == 0)
+  if (*sem != NULL && sv->valid != DEAD_SEM
+      && pthread_mutex_lock(&sv->vlock) == 0)
   {
     if (WaitForSingleObject(sv->s, 0) != WAIT_OBJECT_0)
       InterlockedIncrement((long*)&sv->value);
