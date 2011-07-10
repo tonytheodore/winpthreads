@@ -7,8 +7,13 @@
 #include "sem.h"
 #include "mutex.h"
 #include "ref.h"
+#include "spinlock.h"
 
 int do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout);
+
+/* Locking for checks if semaphore is still valid and avoid
+   asynchrone deletion.  */
+static spin_t spin_sem_locked = {0,LIFE_SPINLOCK,0};
 
 static int sem_result(int res)
 {
@@ -24,29 +29,42 @@ int sem_init(sem_t *sem, int pshared, unsigned int value)
 {
   _sem_t *sv;
 
+  _spin_lite_lock(&spin_sem_locked);
   if (!sem || value > (unsigned int)SEM_VALUE_MAX)
+  {
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EINVAL);
+  }
   if (pshared != PTHREAD_PROCESS_PRIVATE)
+  {
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EPERM);
+  }
 
   if (!(sv = (sem_t)calloc(1,sizeof(*sv))))
+  {
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(ENOMEM); 
+  }
   if (pthread_mutex_init(&sv->vlock, NULL) != 0)
   {
     sv->valid = DEAD_SEM;
     free(sv);
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(ENOSPC);
   }
   if ((sv->s = CreateSemaphore (NULL, 0, SEM_VALUE_MAX, NULL)) == NULL)
   {
     pthread_mutex_destroy(&sv->vlock);
     sv->valid = DEAD_SEM;
-    free(sv); 
+    free(sv);
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(ENOSPC); 
   }
   sv->value = value;
   sv->valid = LIFE_SEM;
   *sem = sv;
+  _spin_lite_unlock(&spin_sem_locked);
   return 0;
 }
 
@@ -55,31 +73,45 @@ int sem_destroy(sem_t *sem)
   _sem_t *sv = NULL;
   int sem_state;
 
+  _spin_lite_lock(&spin_sem_locked);
   if (!sem || (sv = *sem) == NULL)
+  {
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EINVAL);
+  }
   if (sem_result(pthread_mutex_lock(&sv->vlock)) != 0)
+  {
+    _spin_lite_unlock(&spin_sem_locked);
     return -1;
+  }
   if (sv->value < 0 || sv->valid == DEAD_SEM)
   {
     pthread_mutex_unlock(&sv->vlock);
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EBUSY);
   }
   sem_state = sv->valid;
   sv->valid = DEAD_SEM;
+  *sem = NULL;
   if (!CloseHandle (sv->s))
   {
+    *sem = sv;
     sv->valid = sem_state;
     pthread_mutex_unlock(&sv->vlock);
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EINVAL);
   }
   sv->value = SEM_VALUE_MAX;
   *sem = NULL;
   pthread_mutex_unlock(&sv->vlock);
+  _spin_lite_unlock(&spin_sem_locked);
   Sleep(0);
   while (pthread_mutex_destroy (&sv->vlock) == EBUSY)
     Sleep(0);
+  _spin_lite_lock(&spin_sem_locked);
   sv->valid = DEAD_SEM;
   free (sv);
+  _spin_lite_unlock(&spin_sem_locked);
   return 0;
 }
 
@@ -87,16 +119,25 @@ static int sem_std_enter(sem_t *sem,_sem_t **svp)
 {
   _sem_t *sv;
   pthread_testcancel();
+  _spin_lite_lock(&spin_sem_locked);
   if (!sem || (sv = *sem) == NULL || sv->valid == DEAD_SEM)
+  {
+    _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EINVAL);
+  }
   if (sem_result(pthread_mutex_lock(&sv->vlock)) != 0)
+  {
+    _spin_lite_unlock(&spin_sem_locked);
     return -1;
+  }
   if (*sem == NULL || sv->valid == DEAD_SEM)
   {
      pthread_mutex_unlock(&sv->vlock);
+     _spin_lite_unlock(&spin_sem_locked);
      return sem_result(EINVAL);
   }
   *svp = sv;
+  _spin_lite_unlock(&spin_sem_locked);
   return 0;
 }
 
@@ -128,21 +169,24 @@ int sem_wait(sem_t *sem)
   pthread_mutex_unlock(&sv->vlock);
 
   if (cur_v >= 0)
-  {
     return 0;
-  }
+
   cur_v = do_sema_b_wait_intern (sv->s, 2, INFINITE);
   if (!cur_v)
     return 0;
+  _spin_lite_lock(&spin_sem_locked);
   if (*sem != NULL && sv->valid != DEAD_SEM
       && pthread_mutex_lock(&sv->vlock) == 0)
   {
+    _spin_lite_unlock(&spin_sem_locked);
     if (WaitForSingleObject(sv->s, 0) != WAIT_OBJECT_0)
       InterlockedIncrement((long*)&sv->value);
     else
       cur_v = 0;
     pthread_mutex_unlock(&sv->vlock);
   }
+  else
+    _spin_lite_unlock(&spin_sem_locked);
   pthread_testcancel();
   return sem_result(cur_v);
 }
@@ -170,14 +214,18 @@ int sem_timedwait(sem_t *sem, const struct timespec *t)
   if (!cur_v)
     return 0;
 
+  _spin_lite_lock(&spin_sem_locked);
   if (*sem != NULL && pthread_mutex_lock(&sv->vlock) == 0)
   {
+    _spin_lite_unlock(&spin_sem_locked);
     if (WaitForSingleObject(sv->s, 0) != WAIT_OBJECT_0)
       InterlockedIncrement((long*)&sv->value);
     else
       cur_v = 0;
     pthread_mutex_unlock(&sv->vlock);
   }
+  else
+    _spin_lite_unlock(&spin_sem_locked);
   pthread_testcancel();
   return sem_result(cur_v);
 }
