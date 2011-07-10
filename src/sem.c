@@ -81,9 +81,12 @@ sem_init (sem_t *sem, int pshared, unsigned int value)
   _spin_lite_lock(&spin_sem_locked);
   if (!sem || value > (unsigned int)SEM_VALUE_MAX)
   {
+    if (sem)
+      *sem = NULL;
     _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EINVAL);
   }
+  *sem = NULL;
   if (pshared != PTHREAD_PROCESS_PRIVATE)
   {
     _spin_lite_unlock(&spin_sem_locked);
@@ -228,34 +231,43 @@ int sem_trywait(sem_t *sem)
 int
 sem_wait (sem_t *sem)
 {
-  int cur_v;
+  int cur_v, cur_v2;
   _sem_t *sv;
+  HANDLE semh;
 
   if (sem_std_enter (sem, &sv) != 0)
     return -1;
   InterlockedDecrement((long *)&sv->value);
   cur_v = sv->value;
+  semh = sv->s;
   pthread_mutex_unlock(&sv->vlock);
 
   if (cur_v >= 0)
     return 0;
 
-  cur_v = do_sema_b_wait_intern (sv->s, 2, INFINITE);
+  cur_v = do_sema_b_wait_intern (semh, 2, INFINITE);
   if (!cur_v)
     return 0;
   _spin_lite_lock(&spin_sem_locked);
-  if (*sem != NULL && sv->valid != DEAD_SEM
-      && pthread_mutex_lock(&sv->vlock) == 0)
+  cur_v2 = cur_v;
+  if (*sem == sv
+      && (cur_v2 = pthread_mutex_lock(&sv->vlock)) == 0)
   {
     _spin_lite_unlock(&spin_sem_locked);
-    if (WaitForSingleObject(sv->s, 0) != WAIT_OBJECT_0)
+    if (WaitForSingleObject (semh, 0) != WAIT_OBJECT_0)
       InterlockedIncrement((long*)&sv->value);
     else
       cur_v = 0;
     pthread_mutex_unlock(&sv->vlock);
   }
   else
+   {
+     if (*sem == sv)
+       InterlockedIncrement((long*)&sv->value);
+     if (cur_v2 == EINVAL)
+       cur_v = cur_v2;
     _spin_lite_unlock(&spin_sem_locked);
+   }
   pthread_testcancel();
   return sem_result(cur_v);
 }
@@ -298,7 +310,8 @@ sem_timedwait (sem_t *sem, const struct timespec *t)
     }
   else
     {
-      cur_v = EINVAL;
+      if (*sem == sv)
+	InterlockedIncrement((long*)&sv->value);
       _spin_lite_unlock(&spin_sem_locked);
     }
   pthread_testcancel();
