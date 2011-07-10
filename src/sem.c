@@ -127,7 +127,8 @@ sem_init (sem_t *sem, int pshared, unsigned int value)
   return 0;
 }
 
-int sem_destroy(sem_t *sem)
+int
+sem_destroy(sem_t *sem)
 {
   _sem_t *sv = NULL;
   int sem_state;
@@ -137,6 +138,8 @@ int sem_destroy(sem_t *sem)
   if (!sem || (sv = *sem) == NULL
       || (hash = seek_known_sems (sv)) == NULL)
   {
+    if (sem)
+      *sem = NULL;
     _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EINVAL);
   }
@@ -178,7 +181,7 @@ int sem_destroy(sem_t *sem)
 }
 
 static int
-sem_std_enter(sem_t *sem,_sem_t **svp)
+sem_std_enter (sem_t *sem,_sem_t **svp)
 {
   _sem_t *sv;
 
@@ -208,6 +211,7 @@ sem_std_enter(sem_t *sem,_sem_t **svp)
 int sem_trywait(sem_t *sem)
 {
   _sem_t *sv;
+
   if (sem_std_enter (sem, &sv) != 0)
     return -1;
   if (sv->value <= 0)
@@ -221,7 +225,8 @@ int sem_trywait(sem_t *sem)
   return 0;
 }
 
-int sem_wait(sem_t *sem)
+int
+sem_wait (sem_t *sem)
 {
   int cur_v;
   _sem_t *sv;
@@ -255,10 +260,12 @@ int sem_wait(sem_t *sem)
   return sem_result(cur_v);
 }
 
-int sem_timedwait(sem_t *sem, const struct timespec *t)
+int
+sem_timedwait (sem_t *sem, const struct timespec *t)
 {
   int cur_v;
   DWORD dwr;
+  HANDLE semh;
   _sem_t *sv;;
 
   if (!t)
@@ -270,26 +277,30 @@ int sem_timedwait(sem_t *sem, const struct timespec *t)
 
   InterlockedDecrement((long*)&sv->value);
   cur_v = sv->value;
+  semh = sv->s;
   pthread_mutex_unlock(&sv->vlock);
 
   if (cur_v >= 0)
     return 0;
-  cur_v = do_sema_b_wait_intern (sv->s, 2, dwr);
+  cur_v = do_sema_b_wait_intern (semh, 2, dwr);
   if (!cur_v)
     return 0;
 
   _spin_lite_lock(&spin_sem_locked);
-  if (*sem != NULL && pthread_mutex_lock(&sv->vlock) == 0)
-  {
-    _spin_lite_unlock(&spin_sem_locked);
-    if (WaitForSingleObject(sv->s, 0) != WAIT_OBJECT_0)
-      InterlockedIncrement((long*)&sv->value);
-    else
-      cur_v = 0;
-    pthread_mutex_unlock(&sv->vlock);
-  }
+  if (*sem == sv && pthread_mutex_lock(&sv->vlock) == 0)
+    {
+      _spin_lite_unlock(&spin_sem_locked);
+      if (WaitForSingleObject(sv->s, 0) != WAIT_OBJECT_0)
+	InterlockedIncrement((long*)&sv->value);
+      else
+	cur_v = 0;
+      pthread_mutex_unlock(&sv->vlock);
+    }
   else
-    _spin_lite_unlock(&spin_sem_locked);
+    {
+      cur_v = EINVAL;
+      _spin_lite_unlock(&spin_sem_locked);
+    }
   pthread_testcancel();
   return sem_result(cur_v);
 }
@@ -377,6 +388,7 @@ int
 sem_getvalue (sem_t *sem, int *sval)
 {
   _sem_t *sv;;
+
   if (sem_std_enter (sem, &sv) != 0)
     return -1;
 
