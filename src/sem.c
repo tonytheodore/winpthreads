@@ -15,7 +15,55 @@ int do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout);
    asynchrone deletion.  */
 static spin_t spin_sem_locked = {0,LIFE_SPINLOCK,0};
 
-static int sem_result(int res)
+typedef struct sKnownSems {
+  struct sKnownSems *prev;
+  struct sKnownSems *next;
+  void *ptr;
+} sKnownSems;
+
+static sKnownSems root_sem;
+
+static sKnownSems *
+seek_known_sems (void *p)
+{
+  sKnownSems *c = root_sem.next;
+  while (c != NULL && c->ptr != p)
+    c = c->next;
+  return c;
+}
+
+static int
+enter_to_known_sems (void *p)
+{
+  sKnownSems *n;
+  if (!p)
+    return -1;
+  n = (sKnownSems *) malloc (sizeof (sKnownSems));
+  if (!n)
+    return -1;
+  n->next = root_sem.next;
+  n->prev = &root_sem;
+  root_sem.next = n;
+  if (n->next)
+    n->next->prev = n;
+  n->ptr = p;
+  return 0;
+}
+
+static int
+remove_from_known_sems (sKnownSems *p)
+{
+  if (!p)
+    return -1;
+  p->prev->next = p->next;
+  if (p->next)
+    p->next->prev = p->prev;
+  free (p);
+  return 0;
+}
+
+static int
+sem_result (int res)
 {
   if (res != 0) {
     errno = res;
@@ -25,7 +73,8 @@ static int sem_result(int res)
 }
 
 
-int sem_init(sem_t *sem, int pshared, unsigned int value)
+int
+sem_init (sem_t *sem, int pshared, unsigned int value)
 {
   _sem_t *sv;
 
@@ -61,6 +110,16 @@ int sem_init(sem_t *sem, int pshared, unsigned int value)
     _spin_lite_unlock(&spin_sem_locked);
     return sem_result(ENOSPC); 
   }
+  if (enter_to_known_sems (sv) != 0)
+    {
+      CloseHandle (sv->s);
+      pthread_mutex_destroy(&sv->vlock);
+      sv->valid = DEAD_SEM;
+      free(sv);
+      _spin_lite_unlock(&spin_sem_locked);
+      return sem_result(ENOSPC); 
+    }
+
   sv->value = value;
   sv->valid = LIFE_SEM;
   *sem = sv;
@@ -72,9 +131,11 @@ int sem_destroy(sem_t *sem)
 {
   _sem_t *sv = NULL;
   int sem_state;
+  sKnownSems *hash;
 
   _spin_lite_lock(&spin_sem_locked);
-  if (!sem || (sv = *sem) == NULL)
+  if (!sem || (sv = *sem) == NULL
+      || (hash = seek_known_sems (sv)) == NULL)
   {
     _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EINVAL);
@@ -103,6 +164,7 @@ int sem_destroy(sem_t *sem)
   }
   sv->value = SEM_VALUE_MAX;
   *sem = NULL;
+  remove_from_known_sems (hash);
   pthread_mutex_unlock(&sv->vlock);
   _spin_lite_unlock(&spin_sem_locked);
   Sleep(0);
@@ -115,12 +177,14 @@ int sem_destroy(sem_t *sem)
   return 0;
 }
 
-static int sem_std_enter(sem_t *sem,_sem_t **svp)
+static int
+sem_std_enter(sem_t *sem,_sem_t **svp)
 {
   _sem_t *sv;
+
   pthread_testcancel();
   _spin_lite_lock(&spin_sem_locked);
-  if (!sem || (sv = *sem) == NULL || sv->valid == DEAD_SEM)
+  if (!sem || (sv = *sem) == NULL || !seek_known_sems (sv))
   {
     _spin_lite_unlock(&spin_sem_locked);
     return sem_result(EINVAL);
@@ -230,7 +294,8 @@ int sem_timedwait(sem_t *sem, const struct timespec *t)
   return sem_result(cur_v);
 }
 
-int sem_post(sem_t *sem)
+int
+sem_post (sem_t *sem)
 {
   _sem_t *sv;;
 
@@ -258,7 +323,8 @@ int sem_post(sem_t *sem)
   return sem_result(EINVAL);  
 }
 
-int sem_post_multiple(sem_t *sem, int count)
+int
+sem_post_multiple (sem_t *sem, int count)
 {
   int waiters_count;
   _sem_t *sv;;
@@ -288,23 +354,27 @@ int sem_post_multiple(sem_t *sem, int count)
   return 0;
 }
 
-sem_t *sem_open(const char *name, int oflag, mode_t mode, unsigned int value)
+sem_t *
+sem_open (const char *name, int oflag, mode_t mode, unsigned int value)
 {
   sem_result(ENOSYS);
   return NULL;
 }
 
-int sem_close(sem_t *sem)
+int
+sem_close (sem_t *sem)
 {
   return sem_result(ENOSYS);
 }
 
-int sem_unlink(const char *name)
+int
+sem_unlink (const char *name)
 {
   return sem_result(ENOSYS);
 }
 
-int sem_getvalue(sem_t *sem, int *sval)
+int
+sem_getvalue (sem_t *sem, int *sval)
 {
   _sem_t *sv;;
   if (sem_std_enter (sem, &sv) != 0)
