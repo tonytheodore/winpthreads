@@ -41,7 +41,7 @@ host_triplet = @host@
 subdir = .
 DIST_COMMON = $(am__configure_deps) $(include_HEADERS) \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(srcdir)/config.h.in $(top_srcdir)/configure \
+	$(srcdir)/config.h.in $(top_srcdir)/configure COPYING \
 	build-aux/config.guess build-aux/config.sub build-aux/depcomp \
 	build-aux/install-sh build-aux/ltmain.sh build-aux/missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -263,7 +263,7 @@ lib_LIBRARIES = $(am__append_1) $(am__append_2)
 @EXPORT_ALL_SYMBOLS_TRUE@EXPORT_DLL_ALL = --export-all-symbols
 libwinpthread_la_CPPFLAGS = -I$(srcdir)/include -DIN_WINPTHREAD $(EXPORT_DLL_ALL_DEBUG)
 libwinpthread_la_LDFLAGS = -no-undefined -version-info 1:0:0 $(EXPORT_DLL_ALL)
-# -export-symbols-regex '^(pthread|sem|sched|__pth_gpointer)_' ?
+# -export-symbols-regex '^(pthread|sem|sched)_' ?
 libwinpthread_la_SOURCES = \
   src/barrier.h  src/cond.h  src/misc.h  src/mutex.h  src/rwlock.h  src/spinlock.h  src/thread.h  src/ref.h  src/sem.h \
   src/barrier.c  src/cond.c  src/misc.c  src/mutex.c  src/rwlock.c  src/spinlock.c  src/thread.c  src/ref.c  src/sem.c  src/sched.c \
@@ -927,11 +927,11 @@ uninstall-am: uninstall-includeHEADERS uninstall-libLIBRARIES \
 	$(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=CC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
-@COPY_SHARED_TRUE@libpthread.dll.a: libwinpthread.la
-@COPY_SHARED_TRUE@	cp -p $(LT_OBJDIR)/libwinpthread.dll.a $@
+@COPY_SHARED_TRUE@libpthread.dll.a: $(LT_OBJDIR)/libwinpthread.dll.a
+@COPY_SHARED_TRUE@	cp -p $< $@
 @COPY_SHARED_TRUE@	touch $@
-@COPY_STATIC_TRUE@libpthread.a: libwinpthread.la
-@COPY_STATIC_TRUE@	cp -p $(LT_OBJDIR)/libwinpthread.a $@
+@COPY_STATIC_TRUE@libpthread.a: $(LT_OBJDIR)/libwinpthread.a
+@COPY_STATIC_TRUE@	cp -p $< $@
 @COPY_STATIC_TRUE@	touch $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
