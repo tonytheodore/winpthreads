@@ -672,7 +672,7 @@ pthread_setspecific (pthread_key_t key, const void *value)
 {
     _pthread_v *t = __pth_gpointer_locked (pthread_self());
 
-    if (key > t->keymax)
+    if (key >= t->keymax)
       {
         int keymax = (key + 1) * 2;
         void **kv = (void **) realloc (t->keyval, keymax * sizeof (void *));
