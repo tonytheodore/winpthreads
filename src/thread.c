@@ -82,6 +82,25 @@ __pthread_get_pointer (pthread_t id)
   return NULL;
 }
 
+static void
+__pth_remove_use_for_key (pthread_key_t key)
+{
+  int i;
+
+  _spin_lite_lock (&spin_pthr_locked);
+  for (i = 0; i < idListCnt; i++)
+    {
+      if (idList[i].ptr != NULL
+          && idList[i].ptr->keyval != NULL
+          && key < idList[i].ptr->keymax)
+        {
+	  idList[i].ptr->keyval[key] = NULL;
+	  idList[i].ptr->keyval_set[key] = 0;
+	}
+    }
+  _spin_lite_unlock (&spin_pthr_locked);
+}
+
 /* Search the list idList for an element with identifier ID.  If
    found, its associated _pthread_v pointer is returned, otherwise
    NULL.
@@ -662,6 +681,9 @@ pthread_key_delete (pthread_key_t key)
   /* Start next search from our location */
   if (_pthread_key_sch > key)
     _pthread_key_sch = key;
+  /* So now we need to walk the complete list of threads
+     and remove key's reference for it.  */
+  __pth_remove_use_for_key (key);
 
   pthread_rwlock_unlock (&_pthread_key_lock);
   return 0;
