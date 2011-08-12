@@ -92,9 +92,9 @@ __pth_gpointer_locked (pthread_t id)
   struct _pthread_v *ret;
   if (!id)
     return NULL;
-  _spin_lite_lock(&spin_pthr_locked);
+  _spin_lite_lock (&spin_pthr_locked);
   ret =  __pthread_get_pointer (id);
-  _spin_lite_unlock(&spin_pthr_locked);
+  _spin_lite_unlock (&spin_pthr_locked);
   return ret;
 }
 
@@ -296,6 +296,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	      t->h = NULL;
 	    }
 	  pthread_mutex_destroy(&t->p_clock);
+	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
 	  push_pthread_mem(t);
 	  t = NULL;
 	  TlsSetValue(_pthread_tls, t);
@@ -318,6 +319,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	      TlsSetValue(_pthread_tls, t);
 	    }
 	  pthread_mutex_destroy(&t->p_clock);
+	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
 	}
       else if (t)
 	{
@@ -325,6 +327,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	    CloseHandle(t->evStart);
 	  t->evStart = NULL;
 	  pthread_mutex_destroy(&t->p_clock);
+	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
 	}
     }
   return TRUE;
@@ -645,7 +648,7 @@ pthread_key_create (pthread_key_t *key, void (* dest)(void *))
 int
 pthread_key_delete (pthread_key_t key)
 {
-  if (key > _pthread_key_max || !_pthread_key_dest)
+  if (key >= _pthread_key_max || !_pthread_key_dest)
     return EINVAL;
 
   pthread_rwlock_wrlock (&_pthread_key_lock);
@@ -662,33 +665,45 @@ pthread_key_delete (pthread_key_t key)
 void *
 pthread_getspecific (pthread_key_t key)
 {
+  void *r;
   _pthread_v *t = __pth_gpointer_locked (pthread_self());
-
-  return (key >= t->keymax ? NULL : t->keyval[key]);
+  _spin_lite_lock (&t->spin_keys);
+  r = (key >= t->keymax ? NULL : t->keyval[key]);
+  _spin_lite_unlock (&t->spin_keys);
+  return r;
 }
 
 int
 pthread_setspecific (pthread_key_t key, const void *value)
 {
-    _pthread_v *t = __pth_gpointer_locked (pthread_self());
+  _pthread_v *t = __pth_gpointer_locked (pthread_self());
+  
+  _spin_lite_lock (&t->spin_keys);
 
-    if (key >= t->keymax)
-      {
-        int keymax = (key + 1) * 2;
-        void **kv = (void **) realloc (t->keyval, keymax * sizeof (void *));
+  if (key >= t->keymax)
+    {
+      int keymax = (key + 1);
+      void **kv;
 
-        if (!kv)
-          return ENOMEM;
+      kv = (void **) realloc (t->keyval, keymax * sizeof (void *));
 
-        /* Clear new region */
-        memset (&kv[t->keymax], 0, (keymax - t->keymax)*sizeof(void*));
+      if (!kv)
+        {
+	  _spin_lite_unlock (&t->spin_keys);
+	  return ENOMEM;
+	}
 
-        t->keyval = kv;
-        t->keymax = keymax;
-      }
+      /* Clear new region */
+      memset (&kv[t->keymax], 0, (keymax - t->keymax)*sizeof(void *));
 
-    t->keyval[key] = (void *) value;
-    return 0;
+      t->keyval = kv;
+      t->keymax = keymax;
+    }
+
+  t->keyval[key] = (void *) value;
+  _spin_lite_unlock (&t->spin_keys);
+
+  return 0;
 }
 
 int
@@ -723,6 +738,7 @@ _pthread_cleanup_dest (pthread_t t)
     {
       int flag = 0;
 
+      _spin_lite_lock (&tv->spin_keys);
       for (i = 0; i < tv->keymax; i++)
 	{
 	  void *val = tv->keyval[i];
@@ -734,13 +750,15 @@ _pthread_cleanup_dest (pthread_t t)
 		{
 		  /* Call destructor */
 		  tv->keyval[i] = NULL;
+		  _spin_lite_unlock (&tv->spin_keys);
 		  _pthread_key_dest[i](val);
+		  _spin_lite_lock (&tv->spin_keys);
 		  flag = 1;
 		}
 	      pthread_rwlock_unlock(&_pthread_key_lock);
 	    }
 	}
-
+      _spin_lite_unlock (&tv->spin_keys);
       /* Nothing to do? */
       if (!flag)
         return;
@@ -771,6 +789,7 @@ pthread_self (void)
       t->tid = GetCurrentThreadId();
       t->evStart = CreateEvent (NULL, 1, 0, NULL);
       t->p_clock = PTHREAD_MUTEX_INITIALIZER;
+      t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
       t->sched_pol = SCHED_OTHER;
       t->h = NULL; //GetCurrentThread();
       if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &t->h, 0, FALSE, DUPLICATE_SAME_ACCESS))
@@ -1270,11 +1289,11 @@ pthread_create_wrapper (void *args)
   unsigned rslt = 0;
   struct _pthread_v *tv = (struct _pthread_v *)args;
 
-  pthread_mutex_lock(&tv->p_clock);
+  pthread_mutex_lock (&tv->p_clock);
   _pthread_once_raw(&_pthread_tls_once, pthread_tls_init);
   TlsSetValue(_pthread_tls, tv);
   tv->tid = GetCurrentThreadId();
-  pthread_mutex_unlock(&tv->p_clock);
+  pthread_mutex_unlock (&tv->p_clock);
 
 
   if (!setjmp(tv->jb))
@@ -1307,7 +1326,7 @@ pthread_create_wrapper (void *args)
   if (!tv->h)
     {
       tv->valid = DEAD_THREAD;
-      pthread_mutex_unlock(&tv->p_clock);
+      pthread_mutex_unlock (&tv->p_clock);
       pthread_mutex_destroy (&tv->p_clock);
       push_pthread_mem (tv);
       tv = NULL;
@@ -1355,6 +1374,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
   while (++redo <= 4);
 
   tv->p_clock = PTHREAD_MUTEX_INITIALIZER;
+  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
   tv->valid = LIFE_THREAD;
   tv->sched.sched_priority = THREAD_PRIORITY_NORMAL;
   tv->sched_pol = SCHED_OTHER;
@@ -1392,6 +1412,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
       if (tv->evStart)
 	CloseHandle (tv->evStart);
       pthread_mutex_destroy (&tv->p_clock);
+      tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
       tv->evStart = NULL;
       if (th)
         memset(th,0, sizeof (pthread_t));
@@ -1451,6 +1472,7 @@ pthread_join (pthread_t t, void **res)
   if (res)
     *res = tv->ret_arg;
   pthread_mutex_destroy (&tv->p_clock);
+  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
   push_pthread_mem (tv);
 
   return 0;
@@ -1486,6 +1508,7 @@ _pthread_tryjoin (pthread_t t, void **res)
   if (res)
     *res = tv->ret_arg;
   pthread_mutex_destroy (&tv->p_clock);
+  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
 
   push_pthread_mem (tv);
   return 0;
@@ -1522,6 +1545,7 @@ pthread_detach (pthread_t t)
 	    CloseHandle (tv->evStart);
 	  tv->evStart = NULL;
 	  pthread_mutex_destroy (&tv->p_clock);
+	  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
 	  push_pthread_mem (tv);
 	}
     }

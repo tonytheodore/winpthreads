@@ -26,6 +26,7 @@
 #include <windows.h>
 #include <setjmp.h>
 #include "rwlock.h"
+#include "spinlock.h"
 
 #define LIFE_THREAD 0xBAB1F00D
 #define DEAD_THREAD 0xDEADBEEF
@@ -47,6 +48,7 @@ struct _pthread_v
     unsigned int p_state;
     unsigned int keymax;
     void **keyval;
+    spin_t spin_keys;
     DWORD tid;
     int rwlc;
     pthread_rwlock_t rwlq[RWLS_PER_THREAD];
