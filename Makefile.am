@@ -34,14 +34,14 @@ libtool: $(LIBTOOL_DEPS)
 
 if COPY_SHARED
 lib_LIBRARIES += libpthread.dll.a
-libpthread.dll.a: $(LT_OBJDIR)/libwinpthread.dll.a
-	cp -p $< $@
+libpthread.dll.a: libwinpthread.la
+	cp -p $(LT_OBJDIR)/libwinpthread.dll.a $@
 	touch $@
 endif
 
 if COPY_STATIC
 lib_LIBRARIES += libpthread.a
-libpthread.a: $(LT_OBJDIR)/libwinpthread.a
-	cp -p $< $@
+libpthread.a: libwinpthread.la
+	cp -p $(LT_OBJDIR)/libwinpthread.a $@
 	touch $@
 endif
