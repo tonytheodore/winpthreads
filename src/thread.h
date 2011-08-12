@@ -48,6 +48,7 @@ struct _pthread_v
     unsigned int p_state;
     unsigned int keymax;
     void **keyval;
+    unsigned char *keyval_set;
     spin_t spin_keys;
     DWORD tid;
     int rwlc;

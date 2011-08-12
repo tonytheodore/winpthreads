@@ -208,6 +208,10 @@ push_pthread_mem (_pthread_v *sv)
   _spin_lite_lock(&spin_pthr_locked);
   if (sv->x != 0)
     __pthread_deregister_pointer (sv->x);
+  if (sv->keyval)
+    free (sv->keyval);
+  if (sv->keyval_set)
+    free (sv->keyval_set);
   memset (sv, 0, sizeof(struct _pthread_v));
   if (pthr_last == NULL)
     pthr_root = pthr_last = sv;
@@ -608,14 +612,14 @@ pthread_key_create (pthread_key_t *key, void (* dest)(void *))
 	}
     }
 
-    if (!_pthread_key_max)
-      _pthread_key_max = 1;
     if (_pthread_key_max == PTHREAD_KEYS_MAX)
       {
         pthread_rwlock_unlock(&_pthread_key_lock);
         return ENOMEM;
       }
     nmax = _pthread_key_max * 2;
+    if (nmax == 0)
+      nmax = _pthread_key_max + 1;
     if (nmax > PTHREAD_KEYS_MAX)
       nmax = PTHREAD_KEYS_MAX;
 
@@ -623,7 +627,7 @@ pthread_key_create (pthread_key_t *key, void (* dest)(void *))
     d = (void (__cdecl **)(void *))realloc(_pthread_key_dest, nmax * sizeof(*d));
     if (!d)
       {
-        pthread_rwlock_unlock(&_pthread_key_lock);
+        pthread_rwlock_unlock (&_pthread_key_lock);
         return ENOMEM;
       }
 
@@ -652,6 +656,7 @@ pthread_key_delete (pthread_key_t key)
     return EINVAL;
 
   pthread_rwlock_wrlock (&_pthread_key_lock);
+  
   _pthread_key_dest[key] = NULL;
 
   /* Start next search from our location */
@@ -668,7 +673,7 @@ pthread_getspecific (pthread_key_t key)
   void *r;
   _pthread_v *t = __pth_gpointer_locked (pthread_self());
   _spin_lite_lock (&t->spin_keys);
-  r = (key >= t->keymax ? NULL : t->keyval[key]);
+  r = (key >= t->keymax || t->keyval_set[key] == 0 ? NULL : t->keyval[key]);
   _spin_lite_unlock (&t->spin_keys);
   return r;
 }
@@ -684,6 +689,7 @@ pthread_setspecific (pthread_key_t key, const void *value)
     {
       int keymax = (key + 1);
       void **kv;
+      unsigned char *kv_set;
 
       kv = (void **) realloc (t->keyval, keymax * sizeof (void *));
 
@@ -692,15 +698,24 @@ pthread_setspecific (pthread_key_t key, const void *value)
 	  _spin_lite_unlock (&t->spin_keys);
 	  return ENOMEM;
 	}
+      kv_set = (unsigned char *) realloc (t->keyval_set, keymax);
+      if (!kv_set)
+        {
+	  _spin_lite_unlock (&t->spin_keys);
+	  return ENOMEM;
+	}
 
       /* Clear new region */
       memset (&kv[t->keymax], 0, (keymax - t->keymax)*sizeof(void *));
+      memset (&kv_set[t->keymax], 0, (keymax - t->keymax));
 
       t->keyval = kv;
+      t->keyval_set = kv_set;
       t->keymax = keymax;
     }
 
   t->keyval[key] = (void *) value;
+  t->keyval_set[key] = 1;
   _spin_lite_unlock (&t->spin_keys);
 
   return 0;
@@ -743,17 +758,23 @@ _pthread_cleanup_dest (pthread_t t)
 	{
 	  void *val = tv->keyval[i];
 
-	  if (val)
+	  if (tv->keyval_set[i])
 	    {
 	      pthread_rwlock_rdlock (&_pthread_key_lock);
 	      if ((uintptr_t) _pthread_key_dest[i] > 1)
 		{
 		  /* Call destructor */
 		  tv->keyval[i] = NULL;
+		  tv->keyval_set[i] = 0;
 		  _spin_lite_unlock (&tv->spin_keys);
 		  _pthread_key_dest[i](val);
 		  _spin_lite_lock (&tv->spin_keys);
 		  flag = 1;
+		}
+	      else
+	        {
+		  tv->keyval[i] = NULL;
+		  tv->keyval_set[i] = 0;
 		}
 	      pthread_rwlock_unlock(&_pthread_key_lock);
 	    }
