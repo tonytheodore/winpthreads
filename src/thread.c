@@ -28,6 +28,8 @@
 #include "misc.h"
 #include "spinlock.h"
 
+static _pthread_v *__pthread_self_lite (void);
+
 void (**_pthread_key_dest)(void *) = NULL;
 
 static volatile long _pthread_cancelling;
@@ -42,7 +44,7 @@ static unsigned long _pthread_key_max=0L;
 static unsigned long _pthread_key_sch=0L;
 
 static _pthread_v *pthr_root = NULL, *pthr_last = NULL;
-static spin_t spin_pthr_locked = {0,LIFE_SPINLOCK, 1};
+static pthread_mutex_t mtx_pthr_locked = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 
 static __pthread_idlist *idList = NULL;
 static size_t idListCnt = 0;
@@ -87,7 +89,7 @@ __pth_remove_use_for_key (pthread_key_t key)
 {
   int i;
 
-  _spin_lite_lock (&spin_pthr_locked);
+  pthread_mutex_lock (&mtx_pthr_locked);
   for (i = 0; i < idListCnt; i++)
     {
       if (idList[i].ptr != NULL
@@ -98,22 +100,22 @@ __pth_remove_use_for_key (pthread_key_t key)
 	  idList[i].ptr->keyval_set[key] = 0;
 	}
     }
-  _spin_lite_unlock (&spin_pthr_locked);
+  pthread_mutex_unlock (&mtx_pthr_locked);
 }
 
 /* Search the list idList for an element with identifier ID.  If
    found, its associated _pthread_v pointer is returned, otherwise
    NULL.
-   NOTE: This method uses lock spin_pthr_locked.  */
+   NOTE: This method uses lock mtx_pthr_locked.  */
 struct _pthread_v *
 __pth_gpointer_locked (pthread_t id)
 {
   struct _pthread_v *ret;
   if (!id)
     return NULL;
-  _spin_lite_lock (&spin_pthr_locked);
+  pthread_mutex_lock (&mtx_pthr_locked);
   ret =  __pthread_get_pointer (id);
-  _spin_lite_unlock (&spin_pthr_locked);
+  pthread_mutex_unlock (&mtx_pthr_locked);
   return ret;
 }
 
@@ -224,7 +226,7 @@ push_pthread_mem (_pthread_v *sv)
 {
   if (!sv || sv->next != NULL)
     return;
-  _spin_lite_lock(&spin_pthr_locked);
+  pthread_mutex_lock (&mtx_pthr_locked);
   if (sv->x != 0)
     __pthread_deregister_pointer (sv->x);
   if (sv->keyval)
@@ -236,7 +238,7 @@ push_pthread_mem (_pthread_v *sv)
     pthr_root = pthr_last = sv;
   else
     pthr_last->next = sv;
-  _spin_lite_unlock(&spin_pthr_locked);
+  pthread_mutex_unlock (&mtx_pthr_locked);
 }
 
 /* Get a _pthread_v element from pool, or allocate it.
@@ -246,7 +248,7 @@ pop_pthread_mem (void)
 {
   _pthread_v *r = NULL;
 
-  _spin_lite_lock(&spin_pthr_locked);
+  pthread_mutex_lock (&mtx_pthr_locked);
   if ((r = pthr_root) == NULL)
     {
       if ((r = (_pthread_v *)calloc (1,sizeof(struct _pthread_v))) != NULL)
@@ -258,7 +260,7 @@ pop_pthread_mem (void)
 	      r = NULL;
 	    }
 	}
-      _spin_lite_unlock(&spin_pthr_locked);
+      pthread_mutex_unlock (&mtx_pthr_locked);
       return r;
     }
   r->x = __pthread_register_pointer (r);
@@ -271,7 +273,7 @@ pop_pthread_mem (void)
 
       r->next = NULL;
     }
-  _spin_lite_unlock(&spin_pthr_locked);
+  pthread_mutex_unlock (&mtx_pthr_locked);
   return r;
 }
 
@@ -281,7 +283,7 @@ free_pthread_mem (void)
 {
   _pthread_v *t;
   
-  _spin_lite_lock(&spin_pthr_locked);
+  pthread_mutex_lock (&mtx_pthr_locked);
   t = pthr_root;
   pthr_root = pthr_last = NULL;
   while (t != NULL)
@@ -293,7 +295,7 @@ free_pthread_mem (void)
     sv->x = 0;
     free (sv);
   }
-  _spin_lite_unlock(&spin_pthr_locked);
+  pthread_mutex_unlock (&mtx_pthr_locked);
 }
 
 /* Hook for TLS-based deregistration/registration of thread.  */
@@ -302,27 +304,27 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 {
   _pthread_v *t = NULL;
   if (dwReason == DLL_PROCESS_DETACH)
-    free_pthread_mem();
+    free_pthread_mem ();
   else if (dwReason == DLL_THREAD_DETACH)
     {
       if (_pthread_tls != 0xffffffff)
 	t = (_pthread_v *)TlsGetValue(_pthread_tls);
       if (t && t->thread_noposix != 0)
 	{
-	  _pthread_cleanup_dest(t->x);
+	  _pthread_cleanup_dest (t->x);
 	  if (t->h != NULL)
 	    {
-	      CloseHandle(t->h);
+	      CloseHandle (t->h);
 	      if (t->evStart)
-		CloseHandle(t->evStart);
+		CloseHandle (t->evStart);
 	      t->evStart = NULL;
 	      t->h = NULL;
 	    }
-	  pthread_mutex_destroy(&t->p_clock);
+	  pthread_mutex_destroy (&t->p_clock);
 	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK, 1};
-	  push_pthread_mem(t);
+	  push_pthread_mem (t);
 	  t = NULL;
-	  TlsSetValue(_pthread_tls, t);
+	  TlsSetValue (_pthread_tls, t);
 	}
       else if (t && t->ended == 0)
 	{
@@ -330,16 +332,16 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	    CloseHandle(t->evStart);
 	  t->evStart = NULL;
 	  t->ended = 1;
-	  _pthread_cleanup_dest(t->x);
+	  _pthread_cleanup_dest (t->x);
 	  if ((t->p_state & PTHREAD_CREATE_DETACHED) == PTHREAD_CREATE_DETACHED)
 	    {
 	      t->valid = DEAD_THREAD;
 	      if (t->h != NULL)
 		CloseHandle (t->h);
 	      t->h = NULL;
-	      push_pthread_mem(t);
+	      push_pthread_mem (t);
 	      t = NULL;
-	      TlsSetValue(_pthread_tls, t);
+	      TlsSetValue (_pthread_tls, t);
 	    }
 	  pthread_mutex_destroy(&t->p_clock);
 	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK, 1};
@@ -347,9 +349,9 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
       else if (t)
 	{
 	  if (t->evStart)
-	    CloseHandle(t->evStart);
+	    CloseHandle (t->evStart);
 	  t->evStart = NULL;
-	  pthread_mutex_destroy(&t->p_clock);
+	  pthread_mutex_destroy (&t->p_clock);
 	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
 	}
     }
@@ -402,7 +404,7 @@ static collect_once_t *
 enterOnceObject (pthread_once_t *o)
 {
   collect_once_t *c, *p = NULL;
-  _spin_lite_lock(&once_global);
+  _spin_lite_lock (&once_global);
   c = once_obj;
   while (c != NULL && c->o != o)
     {
@@ -421,7 +423,7 @@ enterOnceObject (pthread_once_t *o)
     }
   else
     c->count += 1;
-  _spin_lite_unlock(&once_global);
+  _spin_lite_unlock (&once_global);
   return c;
 }
 
@@ -431,7 +433,7 @@ leaveOnceObject (collect_once_t *c)
   collect_once_t *h, *p = NULL;
   if (!c)
     return;
-  _spin_lite_lock(&once_global);
+  _spin_lite_lock (&once_global);
   h = once_obj;
   while (h != NULL && c != h)
     h = (p = h)->next;
@@ -451,7 +453,7 @@ leaveOnceObject (collect_once_t *c)
     }
   else
     fprintf(stderr, "%p not found?!?!\n", c);
-  _spin_lite_unlock(&once_global);
+  _spin_lite_unlock (&once_global);
 }
 
 static void
@@ -502,7 +504,7 @@ int
 pthread_delay_np (const struct timespec *interval)
 {
   DWORD to = (!interval ? 0 : dwMilliSecs (_pthread_time_in_ms_from_timespec (interval)));
-  struct _pthread_v *s = __pth_gpointer_locked (pthread_self());
+  struct _pthread_v *s = __pthread_self_lite ();
 
   if (!to)
     {
@@ -693,7 +695,7 @@ void *
 pthread_getspecific (pthread_key_t key)
 {
   void *r;
-  _pthread_v *t = __pth_gpointer_locked (pthread_self());
+  _pthread_v *t = __pthread_self_lite ();
   _spin_lite_lock (&t->spin_keys);
   r = (key >= t->keymax || t->keyval_set[key] == 0 ? NULL : t->keyval[key]);
   _spin_lite_unlock (&t->spin_keys);
@@ -703,7 +705,7 @@ pthread_getspecific (pthread_key_t key)
 int
 pthread_setspecific (pthread_key_t key, const void *value)
 {
-  _pthread_v *t = __pth_gpointer_locked (pthread_self());
+  _pthread_v *t = __pthread_self_lite ();
   
   _spin_lite_lock (&t->spin_keys);
 
@@ -808,86 +810,90 @@ _pthread_cleanup_dest (pthread_t t)
     }
 }
 
+static _pthread_v *
+__pthread_self_lite (void)
+{
+  _pthread_v *t;
+
+  _pthread_once_raw (&_pthread_tls_once, pthread_tls_init);
+
+  t = (_pthread_v *) TlsGetValue (_pthread_tls);
+  if (t)
+    return t;
+  /* Main thread? */
+  t = (struct _pthread_v *) pop_pthread_mem ();
+
+  /* If cannot initialize main thread, then the only thing we can do is return null pthread_t */
+  if (!__xl_f || !t)
+    return 0;
+
+  t->p_state = PTHREAD_DEFAULT_ATTR /*| PTHREAD_CREATE_DETACHED*/;
+  t->tid = GetCurrentThreadId();
+  t->evStart = CreateEvent (NULL, 1, 0, NULL);
+  t->p_clock = PTHREAD_MUTEX_INITIALIZER;
+  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
+  t->sched_pol = SCHED_OTHER;
+  t->h = NULL; //GetCurrentThread();
+  if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &t->h, 0, FALSE, DUPLICATE_SAME_ACCESS))
+    abort ();
+  t->sched.sched_priority = GetThreadPriority(t->h);
+  t->ended = 0;
+  t->thread_noposix = 1;
+
+  /* Save for later */
+  if (!TlsSetValue(_pthread_tls, t))
+    abort ();
+  return t;
+}
+
 pthread_t
 pthread_self (void)
 {
   pthread_t ret;
-  _pthread_v *t;
-  ret = 0;
-
-  _pthread_once_raw(&_pthread_tls_once, pthread_tls_init);
-
-  t = (_pthread_v *) TlsGetValue (_pthread_tls);
-
-  /* Main thread? */
-  if (!t)
+  _pthread_v *t = __pthread_self_lite ();
+#if 0
+  if (setjmp(t->jb))
     {
-      t = (struct _pthread_v *) pop_pthread_mem ();
-
-      /* If cannot initialize main thread, then the only thing we can do is return null pthread_t */
-      if (!__xl_f || !t)
-        return ret;
-
-      t->p_state = PTHREAD_DEFAULT_ATTR /*| PTHREAD_CREATE_DETACHED*/;
-      t->tid = GetCurrentThreadId();
-      t->evStart = CreateEvent (NULL, 1, 0, NULL);
-      t->p_clock = PTHREAD_MUTEX_INITIALIZER;
-      t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
-      t->sched_pol = SCHED_OTHER;
-      t->h = NULL; //GetCurrentThread();
-      if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &t->h, 0, FALSE, DUPLICATE_SAME_ACCESS))
-	abort ();
-      t->sched.sched_priority = GetThreadPriority(t->h);
-      t->ended = 0;
-      t->thread_noposix = 1;
-
-      /* Save for later */
-      if (!TlsSetValue(_pthread_tls, t)) abort();
-
-      if (setjmp(t->jb))
+      unsigned rslt = 128;
+      /* Make sure we free ourselves if we are detached */
+      if ((t = (_pthread_v *)TlsGetValue(_pthread_tls)) != NULL)
 	{
-	  unsigned rslt = 128;
-	  /* Make sure we free ourselves if we are detached */
-	  if ((t = (_pthread_v *)TlsGetValue(_pthread_tls)) != NULL)
+	  if (!t->h)
 	    {
-	      if (!t->h)
+	      t->valid = DEAD_THREAD;
+	      if (t->evStart)
+		CloseHandle(t->evStart);
+	      t->evStart = NULL;
+	      rslt = (unsigned) (size_t) t->ret_arg;
+	      push_pthread_mem(t);
+	      t = NULL;
+	      TlsSetValue(_pthread_tls, t);
+	    }
+	  else
+	    {
+	      rslt = (unsigned) (size_t) t->ret_arg;
+	      t->ended = 1;
+	      if (t->evStart)
+		CloseHandle(t->evStart);
+	      t->evStart = NULL;
+	      if ((t->p_state & PTHREAD_CREATE_DETACHED) == PTHREAD_CREATE_DETACHED)
 		{
 		  t->valid = DEAD_THREAD;
-		  if (t->evStart)
-		    CloseHandle(t->evStart);
-		  t->evStart = NULL;
-		  rslt = (unsigned) (size_t) t->ret_arg;
+		  CloseHandle (t->h);
+		  t->h = NULL;
 		  push_pthread_mem(t);
 		  t = NULL;
 		  TlsSetValue(_pthread_tls, t);
 		}
-	      else
-		{
-		  rslt = (unsigned) (size_t) t->ret_arg;
-		  t->ended = 1;
-		  if (t->evStart)
-		    CloseHandle(t->evStart);
-		  t->evStart = NULL;
-		  if ((t->p_state & PTHREAD_CREATE_DETACHED) == PTHREAD_CREATE_DETACHED)
-		    {
-		      t->valid = DEAD_THREAD;
-		      CloseHandle (t->h);
-		      t->h = NULL;
-		      push_pthread_mem(t);
-		      t = NULL;
-		      TlsSetValue(_pthread_tls, t);
-		    }
-		}
 	    }
-	  /* Time to die */
-	  _endthreadex(rslt);
 	}
-  }
+      /* Time to die */
+      _endthreadex(rslt);
+    }
+#endif
   if (!t)
-    return ret;
-  ret = t->x;
-
-  return ret;
+    return 0;
+  return t->x;
 }
 
 /* Internal helper for getting event handle of thread T.  */
@@ -910,7 +916,7 @@ pthread_gethandle (pthread_t t)
 struct _pthread_cleanup **
 pthread_getclean (void)
 {
-  struct _pthread_v *t = __pth_gpointer_locked (pthread_self());
+  struct _pthread_v *t = __pthread_self_lite ();
   if (!t) return NULL;
   return &t->clean;
 }
@@ -934,7 +940,7 @@ pthread_exit (void *res)
 {
   _pthread_v *t = NULL;
   unsigned rslt = (unsigned) ((intptr_t) res);
-  struct _pthread_v *id = __pth_gpointer_locked (pthread_self());
+  struct _pthread_v *id = __pthread_self_lite ();
 
   if (!id)
     return EINVAL;
@@ -984,7 +990,7 @@ pthread_exit (void *res)
 void
 _pthread_invoke_cancel (void)
 {
-  struct _pthread_v *se = __pth_gpointer_locked (pthread_self());
+  struct _pthread_v *se = __pthread_self_lite ();
   se->in_cancel = 1;
   _pthread_cleanup *pcup;
   _pthread_setnobreak (1);
@@ -1006,7 +1012,7 @@ __pthread_shallcancel (void)
   struct _pthread_v *t;
   if (!_pthread_cancelling)
     return 0;
-  t = __pth_gpointer_locked (pthread_self ());
+  t = __pthread_self_lite ();
   if (t == NULL)
     return 0;
   if (t->nobreak <= 0 && t->cancelled && (t->p_state & PTHREAD_CANCEL_ENABLE))
@@ -1017,7 +1023,7 @@ __pthread_shallcancel (void)
 void
 _pthread_setnobreak (int v)
 {
-  struct _pthread_v *t = __pth_gpointer_locked (pthread_self());
+  struct _pthread_v *t = __pthread_self_lite ();
   if (t == NULL)
     return;
   if (v > 0)
@@ -1029,7 +1035,7 @@ _pthread_setnobreak (int v)
 void
 pthread_testcancel (void)
 {
-  struct _pthread_v *self = __pth_gpointer_locked (pthread_self ());
+  struct _pthread_v *self = __pthread_self_lite ();
 
   if (!self || self->in_cancel)
     return;
@@ -1153,15 +1159,15 @@ pthread_kill (pthread_t t, int sig)
 {
   struct _pthread_v *tv;
 
-  _spin_lite_lock (&spin_pthr_locked);
+  pthread_mutex_lock (&mtx_pthr_locked);
   tv = __pthread_get_pointer (t);
   if (!tv || t != tv->x || tv->in_cancel || tv->ended || tv->h == NULL ||
       tv->h == INVALID_HANDLE_VALUE)
   {
-    _spin_lite_unlock (&spin_pthr_locked);
+    pthread_mutex_unlock (&mtx_pthr_locked);
     return ESRCH;
   }
-  _spin_lite_unlock (&spin_pthr_locked);
+  pthread_mutex_unlock (&mtx_pthr_locked);
   if (!sig)
     return 0;
   if (sig < SIGINT || sig > NSIG)
@@ -1291,7 +1297,7 @@ test_cancel_locked (pthread_t t)
 int
 pthread_setcancelstate (int state, int *oldstate)
 {
-  _pthread_v *t = __pth_gpointer_locked (pthread_self());
+  _pthread_v *t = __pthread_self_lite ();
 
   if (!t || (state & PTHREAD_CANCEL_ENABLE) != state)
     return EINVAL;
@@ -1310,7 +1316,7 @@ pthread_setcancelstate (int state, int *oldstate)
 int
 pthread_setcanceltype (int type, int *oldtype)
 {
-  _pthread_v *t = __pth_gpointer_locked (pthread_self());
+  _pthread_v *t = __pthread_self_lite ();
 
   if (!t || (type & PTHREAD_CANCEL_ASYNCHRONOUS) != type)
     return EINVAL;
@@ -1332,6 +1338,7 @@ pthread_create_wrapper (void *args)
   unsigned rslt = 0;
   struct _pthread_v *tv = (struct _pthread_v *)args;
 
+  pthread_mutex_lock (&mtx_pthr_locked);
   pthread_mutex_lock (&tv->p_clock);
   _pthread_once_raw(&_pthread_tls_once, pthread_tls_init);
   TlsSetValue(_pthread_tls, tv);
@@ -1352,14 +1359,19 @@ pthread_create_wrapper (void *args)
 	  "\t.text"
 	  );
       #endif      /* Call function and save return value */
+      pthread_mutex_unlock (&mtx_pthr_locked);
       trslt = (intptr_t) tv->func(tv->ret_arg);
       #ifdef __SEH__
 	asm ("\tnop\n\t.tl_end: nop\n");
       #endif
+      pthread_mutex_lock (&mtx_pthr_locked);
       tv->ret_arg = (void*) trslt;
       /* Clean up destructors */
       _pthread_cleanup_dest(tv->x);
     }
+  else
+    pthread_mutex_lock (&mtx_pthr_locked);
+
   pthread_mutex_lock (&tv->p_clock);
   rslt = (unsigned) (size_t) tv->ret_arg;
   /* Make sure we free ourselves if we are detached */
@@ -1381,7 +1393,8 @@ pthread_create_wrapper (void *args)
       pthread_mutex_unlock (&tv->p_clock);
       pthread_mutex_destroy (&tv->p_clock);
     }
-
+  while (pthread_mutex_unlock (&mtx_pthr_locked) == 0)
+   Sleep (0);
   _endthreadex (rslt);
   return rslt;
 }
@@ -1437,7 +1450,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
       pthread_attr_getinheritsched (attr, &inh);
       if (inh)
 	{
-	  tv->sched.sched_priority = __pth_gpointer_locked (pthread_self ())->sched.sched_priority;
+	  tv->sched.sched_priority = __pthread_self_lite ()->sched.sched_priority;
 	}
       else
 	tv->sched.sched_priority = attr->param.sched_priority;
@@ -1487,6 +1500,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
       tv->h = thrd;
       ResumeThread (thrd);
     }
+  Sleep (0);
   return 0;
 }
 
@@ -1525,22 +1539,35 @@ int
 _pthread_tryjoin (pthread_t t, void **res)
 {
   DWORD dwFlags;
-  struct _pthread_v *tv = __pth_gpointer_locked (t);
+  struct _pthread_v *tv;
+
+  pthread_mutex_lock (&mtx_pthr_locked);
+  tv = __pth_gpointer_locked (t);
 
   if (!tv || tv->h == NULL || !GetHandleInformation(tv->h, &dwFlags))
-    return ESRCH;
+    {
+      pthread_mutex_unlock (&mtx_pthr_locked);
+      return ESRCH;
+    }
 
   if ((tv->p_state & PTHREAD_CREATE_DETACHED) != 0)
-    return EINVAL;
+    {
+      pthread_mutex_unlock (&mtx_pthr_locked);
+      return EINVAL;
+    }
   if (pthread_equal(pthread_self(), t))
-    return EDEADLK;
-
-  pthread_testcancel ();
-
+    {
+      pthread_mutex_unlock (&mtx_pthr_locked);
+      return EDEADLK;
+    }
   if(tv->ended == 0 && WaitForSingleObject(tv->h, 0))
     {
       if (tv->ended == 0);
-	return EBUSY;
+        {
+	  pthread_mutex_unlock (&mtx_pthr_locked);
+	  pthread_testcancel ();
+	  return EBUSY;
+	}
     }
   CloseHandle (tv->h);
   if (tv->evStart)
@@ -1554,6 +1581,9 @@ _pthread_tryjoin (pthread_t t, void **res)
   tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
 
   push_pthread_mem (tv);
+
+  pthread_mutex_unlock (&mtx_pthr_locked);
+  pthread_testcancel ();
   return 0;
 }
 
@@ -1565,15 +1595,17 @@ pthread_detach (pthread_t t)
   struct _pthread_v *tv = __pth_gpointer_locked (t);
   HANDLE dw;
 
-  /*
-   * This can't race with thread exit because
-   * our call would be undefined if called on a dead thread.
-   */
-
+  pthread_mutex_lock (&mtx_pthr_locked);
   if (!tv || tv->h == NULL || !GetHandleInformation(tv->h, &dwFlags))
-    return ESRCH;
+    {
+      pthread_mutex_unlock (&mtx_pthr_locked);
+      return ESRCH;
+    }
   if ((tv->p_state & PTHREAD_CREATE_DETACHED) != 0)
-    return EINVAL;
+    {
+      pthread_mutex_unlock (&mtx_pthr_locked);
+      return EINVAL;
+    }
   /* if (tv->ended) r = ESRCH; */
   dw = tv->h;
   tv->h = 0;
@@ -1592,6 +1624,7 @@ pthread_detach (pthread_t t)
 	  push_pthread_mem (tv);
 	}
     }
+  pthread_mutex_unlock (&mtx_pthr_locked);
 
   return r;
 }

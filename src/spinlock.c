@@ -41,10 +41,26 @@ dec_test (long volatile *p)
 }
 
 static int
+lock_test (long volatile *p)
+{
+  unsigned char ret = 0;
+  __asm__ __volatile__ (
+    "\tcmpl $1,%1\n"
+    "\tsetnz %0"
+    : "+r" (ret), "+m" (*p)
+    : : "memory");
+  return (ret != 0);
+}
+
+static int
 inc_test (long volatile *p)
 {
-  while (*p < 1)
-    YieldProcessor ();
+  while (lock_test (p))
+    {
+      //YieldProcessor ();
+      Sleep (0);
+    }
+  return 0;
 }
 
 static inline int
@@ -121,9 +137,18 @@ int pthread_spin_lock(pthread_spinlock_t *l)
       return r;
   }
   _l = (spin_t *)*l;
-  while (*l != NULL && !dec_test (&_l->l))
+  while (*l != NULL)
     {
-      inc_test (&_l->l);
+      int wait_lock = 1 - _l->l;
+      do
+        {
+	  inc_test (&_l->l);
+	  if (wait_lock)
+	    Sleep (0);
+	}
+      while (--wait_lock >= 0);
+      if (dec_test (&_l->l))
+        break;
     }
   return (*l != NULL ? 0 : EINVAL);
 }
@@ -142,7 +167,7 @@ int pthread_spin_trylock(pthread_spinlock_t *l)
   }
 
   _l = (spin_t *)*l;
-  if (dec_test (&_l->l))
+  if (_l->l == 1 && dec_test (&_l->l))
     return 0;
   return EBUSY;
 }
@@ -150,9 +175,8 @@ int pthread_spin_trylock(pthread_spinlock_t *l)
 int _spin_lite_trylock(spin_t *l)
 {
   CHECK_SPINLOCK_LITE(l);
-  if (dec_test (&l->l))
+  if (l->l == 1 && dec_test (&l->l))
     return 0;
-  inc_test (&l->l);
   return EBUSY;
 }
 int _spin_lite_unlock(spin_t *l)
@@ -164,13 +188,22 @@ int _spin_lite_unlock(spin_t *l)
 }
 
 int
-_spin_lite_lock(spin_t *l)
+_spin_lite_lock (spin_t *l)
 {
   CHECK_SPINLOCK_LITE(l);
 
-  while (!dec_test (&l->l))
+  while (1)
     {
-      inc_test (&l->l);
+      int wait_lock = 1 - l->l;
+      do
+        {
+	  inc_test (&l->l);
+	  if (wait_lock)
+	    Sleep (0);
+	}
+      while (--wait_lock >= 0);
+      if (dec_test (&l->l))
+        break;
     }
       
   return 0;
@@ -181,7 +214,7 @@ int
 pthread_spin_unlock (pthread_spinlock_t *l)
 {
   spin_t *_l;
-  int r;
+
   if (!l || *l == NULL)
     return EINVAL;
   if (*l == PTHREAD_SPINLOCK_INITIALIZER)
