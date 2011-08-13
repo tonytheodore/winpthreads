@@ -33,57 +33,6 @@
 
 int do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout);
 
-/* Locking for checks if semaphore is still valid and avoid
-   asynchrone deletion.  */
-static spin_t spin_sem_locked = {0,LIFE_SPINLOCK,0};
-
-typedef struct sKnownSems {
-  struct sKnownSems *prev;
-  struct sKnownSems *next;
-  void *ptr;
-} sKnownSems;
-
-static sKnownSems root_sem;
-
-static sKnownSems *
-seek_known_sems (void *p)
-{
-  sKnownSems *c = root_sem.next;
-  while (c != NULL && c->ptr != p)
-    c = c->next;
-  return c;
-}
-
-static int
-enter_to_known_sems (void *p)
-{
-  sKnownSems *n;
-  if (!p)
-    return -1;
-  n = (sKnownSems *) malloc (sizeof (sKnownSems));
-  if (!n)
-    return -1;
-  n->next = root_sem.next;
-  n->prev = &root_sem;
-  root_sem.next = n;
-  if (n->next)
-    n->next->prev = n;
-  n->ptr = p;
-  return 0;
-}
-
-static int
-remove_from_known_sems (sKnownSems *p)
-{
-  if (!p)
-    return -1;
-  p->prev->next = p->next;
-  if (p->next)
-    p->next->prev = p->prev;
-  free (p);
-  return 0;
-}
-
 static int
 sem_result (int res)
 {
@@ -122,17 +71,6 @@ sem_init (sem_t *sem, int pshared, unsigned int value)
       return sem_result(ENOSPC); 
     }
 
-  _spin_lite_lock (&spin_sem_locked);
-  if (enter_to_known_sems (sv) != 0)
-    {
-      CloseHandle (sv->s);
-      pthread_mutex_destroy(&sv->vlock);
-      free(sv);
-      _spin_lite_unlock (&spin_sem_locked);
-      return sem_result (ENOSPC); 
-    }
-  _spin_lite_unlock (&spin_sem_locked);
-
   sv->valid = LIFE_SEM;
   *sem = sv;
   return 0;
@@ -143,44 +81,30 @@ sem_destroy (sem_t *sem)
 {
   int r;
   _sem_t *sv = NULL;
-  sKnownSems *hash;
 
-  _spin_lite_lock (&spin_sem_locked);
-  if (!sem || (sv = *sem) == NULL
-      || (hash = seek_known_sems (sv)) == NULL)
-    {
-      _spin_lite_unlock (&spin_sem_locked);
-      return sem_result (EINVAL);
-    }
+  if (!sem || (sv = *sem) == NULL)
+    return sem_result (EINVAL);
   if ((r = pthread_mutex_lock (&sv->vlock)) != 0)
-    {
-      _spin_lite_unlock (&spin_sem_locked);
-      return sem_result (r);
-    }
+    return sem_result (r);
+
   if (sv->value < 0 || sv->valid == DEAD_SEM)
     {
       pthread_mutex_unlock (&sv->vlock);
-      _spin_lite_unlock (&spin_sem_locked);
       return sem_result (EBUSY);
     }
   if (!CloseHandle (sv->s))
     {
       pthread_mutex_unlock (&sv->vlock);
-      _spin_lite_unlock (&spin_sem_locked);
       return sem_result (EINVAL);
     }
   *sem = NULL;
   sv->value = SEM_VALUE_MAX;
   pthread_mutex_unlock(&sv->vlock);
-  _spin_lite_unlock(&spin_sem_locked);
   Sleep (0);
   while (pthread_mutex_destroy (&sv->vlock) == EBUSY)
     Sleep (0);
-  _spin_lite_lock (&spin_sem_locked);
-  remove_from_known_sems (hash);
   sv->valid = DEAD_SEM;
   free (sv);
-  _spin_lite_unlock (&spin_sem_locked);
   return 0;
 }
 
@@ -192,18 +116,12 @@ sem_std_enter (sem_t *sem,_sem_t **svp, int do_test)
 
   if (do_test)
     pthread_testcancel ();
-  _spin_lite_lock (&spin_sem_locked);
-  if (!sem || (sv = *sem) == NULL)
-    {
-      _spin_lite_unlock (&spin_sem_locked);
-      return sem_result (EINVAL);
-    }
-  if (!seek_known_sems (sv))
-    {
-      _spin_lite_unlock (&spin_sem_locked);
-      return sem_result (EINVAL);
-    }
-  _spin_lite_unlock (&spin_sem_locked);
+  if (!sem)
+    return sem_result (EINVAL);
+  sv = *sem;
+  if (sv == NULL)
+    return sem_result (EINVAL);
+
   if ((r = pthread_mutex_lock (&sv->vlock)) != 0)
     return sem_result (r);
 
@@ -248,12 +166,10 @@ clean_wait_sem (void *s)
   if (sem_std_enter (p->p, &sv, 0) != 0)
     return;
 
-  _spin_lite_lock (&spin_sem_locked);
   if (WaitForSingleObject (sv->s, 0) != WAIT_OBJECT_0)
     InterlockedIncrement ((long *) &sv->value);
   else if (p->ret)
     p->ret[0] = 0;
-  _spin_lite_unlock (&spin_sem_locked);
   pthread_mutex_unlock (&sv->vlock);
 }
 
@@ -423,13 +339,9 @@ sem_getvalue (sem_t *sem, int *sval)
   if (!sval)
     return sem_result (EINVAL);
 
-  _spin_lite_lock (&spin_sem_locked);
-  if (!sem || (sv = *sem) == NULL || !seek_known_sems (sv))
-    {
-      _spin_lite_unlock (&spin_sem_locked);
-      return sem_result (EINVAL);
-    }
-  _spin_lite_unlock (&spin_sem_locked);
+  if (!sem || (sv = *sem) == NULL)
+    return sem_result (EINVAL);
+
   if ((r = pthread_mutex_lock (&sv->vlock)) != 0)
     return sem_result (r);
   if (*sem == NULL || sv->valid == DEAD_SEM)

@@ -42,7 +42,7 @@ static unsigned long _pthread_key_max=0L;
 static unsigned long _pthread_key_sch=0L;
 
 static _pthread_v *pthr_root = NULL, *pthr_last = NULL;
-static spin_t spin_pthr_locked = {0,LIFE_SPINLOCK,0};
+static spin_t spin_pthr_locked = {0,LIFE_SPINLOCK, 1};
 
 static __pthread_idlist *idList = NULL;
 static size_t idListCnt = 0;
@@ -319,7 +319,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	      t->h = NULL;
 	    }
 	  pthread_mutex_destroy(&t->p_clock);
-	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK, 1};
 	  push_pthread_mem(t);
 	  t = NULL;
 	  TlsSetValue(_pthread_tls, t);
@@ -342,7 +342,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	      TlsSetValue(_pthread_tls, t);
 	    }
 	  pthread_mutex_destroy(&t->p_clock);
-	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK, 1};
 	}
       else if (t)
 	{
@@ -350,7 +350,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	    CloseHandle(t->evStart);
 	  t->evStart = NULL;
 	  pthread_mutex_destroy(&t->p_clock);
-	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
 	}
     }
   return TRUE;
@@ -396,7 +396,7 @@ typedef struct collect_once_t {
 
 static collect_once_t *once_obj = NULL;
 
-static spin_t once_global = {0,LIFE_SPINLOCK,0};
+static spin_t once_global = {0,LIFE_SPINLOCK,1};
 
 static collect_once_t *
 enterOnceObject (pthread_once_t *o)
@@ -832,7 +832,7 @@ pthread_self (void)
       t->tid = GetCurrentThreadId();
       t->evStart = CreateEvent (NULL, 1, 0, NULL);
       t->p_clock = PTHREAD_MUTEX_INITIALIZER;
-      t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+      t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
       t->sched_pol = SCHED_OTHER;
       t->h = NULL; //GetCurrentThread();
       if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &t->h, 0, FALSE, DUPLICATE_SAME_ACCESS))
@@ -1417,7 +1417,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
   while (++redo <= 4);
 
   tv->p_clock = PTHREAD_MUTEX_INITIALIZER;
-  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
   tv->valid = LIFE_THREAD;
   tv->sched.sched_priority = THREAD_PRIORITY_NORMAL;
   tv->sched_pol = SCHED_OTHER;
@@ -1455,7 +1455,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
       if (tv->evStart)
 	CloseHandle (tv->evStart);
       pthread_mutex_destroy (&tv->p_clock);
-      tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+      tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
       tv->evStart = NULL;
       if (th)
         memset(th,0, sizeof (pthread_t));
@@ -1515,7 +1515,7 @@ pthread_join (pthread_t t, void **res)
   if (res)
     *res = tv->ret_arg;
   pthread_mutex_destroy (&tv->p_clock);
-  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
   push_pthread_mem (tv);
 
   return 0;
@@ -1551,7 +1551,7 @@ _pthread_tryjoin (pthread_t t, void **res)
   if (res)
     *res = tv->ret_arg;
   pthread_mutex_destroy (&tv->p_clock);
-  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
 
   push_pthread_mem (tv);
   return 0;
@@ -1588,7 +1588,7 @@ pthread_detach (pthread_t t)
 	    CloseHandle (tv->evStart);
 	  tv->evStart = NULL;
 	  pthread_mutex_destroy (&tv->p_clock);
-	  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,0};
+	  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
 	  push_pthread_mem (tv);
 	}
     }

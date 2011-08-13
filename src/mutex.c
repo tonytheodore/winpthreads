@@ -33,8 +33,8 @@ extern int do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout);
 static __attribute__((noinline)) int mutex_static_init(pthread_mutex_t *m);
 static __attribute__((noinline)) int _mutex_trylock(pthread_mutex_t *m);
 
-static spin_t mutex_global = {0,LIFE_SPINLOCK,0};
-static spin_t mutex_global_static = {0,LIFE_SPINLOCK,0};
+static spin_t mutex_global = {0,LIFE_SPINLOCK,1};
+static spin_t mutex_global_static = {0,LIFE_SPINLOCK,1};
 
 static __attribute__((noinline)) int
 mutex_unref(pthread_mutex_t *m, int r)

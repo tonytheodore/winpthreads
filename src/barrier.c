@@ -28,7 +28,7 @@
 #include "misc.h"
 #include "spinlock.h"
 
-static spin_t barrier_global = {0,LIFE_SPINLOCK,0};
+static spin_t barrier_global = {0,LIFE_SPINLOCK,1};
 
 static __attribute__((noinline)) int
 barrier_unref(volatile pthread_barrier_t *barrier, int res)

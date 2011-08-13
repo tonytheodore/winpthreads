@@ -26,12 +26,26 @@
 #include "spinlock.h"
 #include "misc.h"
       
-static int scnt = 0;
-static LONG bscnt = 0;
-static int scntMax = 0;
+static spin_t spin_locked = {0,LIFE_SPINLOCK, 1};
 
-static spin_t spin_locked = {0,LIFE_SPINLOCK,0};
+static int
+dec_test (long volatile *p)
+{
+  unsigned char ret = 0;
+  __asm__ __volatile__ ("lock\n\t"
+    "decl %1\n"
+    "setz %0"
+    : "+r" (ret), "+m" (*p)
+    : : "memory");
+  return (ret != 0);
+}
 
+static int
+inc_test (long volatile *p)
+{
+  while (*p < 1)
+    YieldProcessor ();
+}
 
 static inline int
 spinlock_static_init (pthread_spinlock_t *l)
@@ -63,6 +77,7 @@ int pthread_spin_init(pthread_spinlock_t *l, int pshared)
         return ENOMEM;
 
     _l->valid = LIFE_SPINLOCK;
+    _l->l = 1;
     *l = _l;
     return 0;
 }
@@ -83,11 +98,11 @@ int pthread_spin_destroy(pthread_spinlock_t *l)
   if (((spin_t *)(*l))->valid != (unsigned int)LIFE_SPINLOCK)
     return EINVAL;
   
-  if (_l->l != 0)
+  if (_l->l != 1)
     return EBUSY;
   *l= NULL; /* dereference first, free later */
   _l->valid  = DEAD_SPINLOCK;
-  _l->l = 0;
+  _l->l = 1;
   free(_l);
   return 0;
 }
@@ -106,11 +121,11 @@ int pthread_spin_lock(pthread_spinlock_t *l)
       return r;
   }
   _l = (spin_t *)*l;
-  while (InterlockedExchange((long*)&_l->l, EBUSY) == EBUSY)
-  {
-    YieldProcessor();
-  }
-  return 0;
+  while (*l != NULL && !dec_test (&_l->l))
+    {
+      inc_test (&_l->l);
+    }
+  return (*l != NULL ? 0 : EINVAL);
 }
 
 int pthread_spin_trylock(pthread_spinlock_t *l)
@@ -127,70 +142,38 @@ int pthread_spin_trylock(pthread_spinlock_t *l)
   }
 
   _l = (spin_t *)*l;
-
-  r = InterlockedExchange(&_l->l, EBUSY);
-  return r;
-}
-
-int _spin_lite_getsc(int reset)
-{
-    int r = scnt;
-    if (reset) scnt = 0;
-    return r;
-}
-
-int _spin_lite_getbsc(int reset)
-{
-    int r = bscnt;
-    if (reset) bscnt = 0;
-    return r;
-}
-
-int _spin_lite_getscMax(int reset)
-{
-    int r = scntMax;
-    if (reset) scntMax = 0;
-    return r;
+  if (dec_test (&_l->l))
+    return 0;
+  return EBUSY;
 }
 
 int _spin_lite_trylock(spin_t *l)
 {
-    CHECK_SPINLOCK_LITE(l);
-    return InterlockedExchange(&l->l, EBUSY);
+  CHECK_SPINLOCK_LITE(l);
+  if (dec_test (&l->l))
+    return 0;
+  inc_test (&l->l);
+  return EBUSY;
 }
 int _spin_lite_unlock(spin_t *l)
 {
     CHECK_SPINLOCK_LITE(l);
-    /* Compiler barrier.  The store below acts with release symmantics.  */
-    _ReadWriteBarrier();
-    l->l = 0;
+    l->l = 1;
 
     return 0;
 }
-int _spin_lite_lock(spin_t *l)
+
+int
+_spin_lite_lock(spin_t *l)
 {
-    CHECK_SPINLOCK_LITE(l);
-    int lscnt = 0;
+  CHECK_SPINLOCK_LITE(l);
 
-    _vol_spinlock v;
-    v.l = (LONG *)&l->l;
-    _spin_lite_lock_inc(bscnt);
-    while (InterlockedExchange(v.lv, EBUSY))
+  while (!dec_test (&l->l))
     {
-        _spin_lite_lock_cnt(lscnt);
-        /* Don't lock the bus whilst waiting */
-        while (*v.lv)
-        {
-            _spin_lite_lock_cnt(lscnt);
-            YieldProcessor();
-
-            /* Compiler barrier.  Prevent caching of *l */
-            _ReadWriteBarrier();
-        }
+      inc_test (&l->l);
     }
-    _spin_lite_lock_dec(bscnt);
-    _spin_lite_lock_stat(lscnt);
-    return 0;
+      
+  return 0;
 }
 
 
@@ -204,8 +187,8 @@ pthread_spin_unlock (pthread_spinlock_t *l)
   if (*l == PTHREAD_SPINLOCK_INITIALIZER)
     return EPERM;
   _l = (spin_t *)*l;
-
-  /* Compiler barrier.  The store below acts with release symmantics.  */
-  r = InterlockedExchange((long*)&_l->l, 0);
-  return (!r ? EPERM : 0);
+  if (_l->l >= 1)
+    return EPERM;
+  _l->l = 1;
+  return 0;
 }

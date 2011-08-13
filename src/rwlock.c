@@ -29,7 +29,7 @@
 #include "spinlock.h"
 #include "misc.h"
 
-static spin_t rwl_global = {0,LIFE_SPINLOCK,0};
+static spin_t rwl_global = {0,LIFE_SPINLOCK,1};
 
 static __attribute__((noinline)) int rwlock_static_init(pthread_rwlock_t *rw);
 
@@ -148,7 +148,7 @@ void rwl_print(volatile pthread_rwlock_t *rwl, char *txt)
 }
 #endif
 
-static spin_t cond_locked = {0,LIFE_SPINLOCK,0};
+static spin_t cond_locked = {0,LIFE_SPINLOCK,1};
 
 static __attribute__((noinline)) int rwlock_static_init(pthread_rwlock_t *rw)
 {
