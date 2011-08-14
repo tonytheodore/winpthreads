@@ -282,18 +282,36 @@ static void
 free_pthread_mem (void)
 {
   _pthread_v *t;
-  
+
+  if (1)
+  return;  
   pthread_mutex_lock (&mtx_pthr_locked);
   t = pthr_root;
-  pthr_root = pthr_last = NULL;
   while (t != NULL)
   {
     _pthread_v *sv = t;
     t = t->next;
+    if (sv->x != 0 && sv->ended == 0 && sv->valid != DEAD_THREAD)
+      {
+	pthread_mutex_unlock (&mtx_pthr_locked);
+	pthread_cancel (t->x);
+	Sleep (0);
+	pthread_mutex_lock (&mtx_pthr_locked);
+	t = pthr_root;
+	continue;
+      }
+    else if (sv->x != 0 && sv->valid != DEAD_THREAD)
+      {
+	pthread_mutex_unlock (&mtx_pthr_locked);
+	Sleep (0);
+	pthread_mutex_lock (&mtx_pthr_locked);
+	continue;
+      }
     if (sv->x != 0)
       __pthread_deregister_pointer (sv->x);
     sv->x = 0;
     free (sv);
+    pthr_root = t;
   }
   pthread_mutex_unlock (&mtx_pthr_locked);
 }
@@ -304,7 +322,9 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 {
   _pthread_v *t = NULL;
   if (dwReason == DLL_PROCESS_DETACH)
-    free_pthread_mem ();
+    {
+      free_pthread_mem ();
+    }
   else if (dwReason == DLL_THREAD_DETACH)
     {
       if (_pthread_tls != 0xffffffff)
@@ -849,48 +869,8 @@ __pthread_self_lite (void)
 pthread_t
 pthread_self (void)
 {
-  pthread_t ret;
   _pthread_v *t = __pthread_self_lite ();
-#if 0
-  if (setjmp(t->jb))
-    {
-      unsigned rslt = 128;
-      /* Make sure we free ourselves if we are detached */
-      if ((t = (_pthread_v *)TlsGetValue(_pthread_tls)) != NULL)
-	{
-	  if (!t->h)
-	    {
-	      t->valid = DEAD_THREAD;
-	      if (t->evStart)
-		CloseHandle(t->evStart);
-	      t->evStart = NULL;
-	      rslt = (unsigned) (size_t) t->ret_arg;
-	      push_pthread_mem(t);
-	      t = NULL;
-	      TlsSetValue(_pthread_tls, t);
-	    }
-	  else
-	    {
-	      rslt = (unsigned) (size_t) t->ret_arg;
-	      t->ended = 1;
-	      if (t->evStart)
-		CloseHandle(t->evStart);
-	      t->evStart = NULL;
-	      if ((t->p_state & PTHREAD_CREATE_DETACHED) == PTHREAD_CREATE_DETACHED)
-		{
-		  t->valid = DEAD_THREAD;
-		  CloseHandle (t->h);
-		  t->h = NULL;
-		  push_pthread_mem(t);
-		  t = NULL;
-		  TlsSetValue(_pthread_tls, t);
-		}
-	    }
-	}
-      /* Time to die */
-      _endthreadex(rslt);
-    }
-#endif
+
   if (!t)
     return 0;
   return t->x;

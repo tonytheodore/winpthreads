@@ -34,7 +34,7 @@
 typedef struct _pthread_v _pthread_v;
 struct _pthread_v
 {
-    unsigned int valid;   
+    unsigned int valid;
     void *ret_arg;
     void *(* func)(void *);
     _pthread_cleanup *clean;

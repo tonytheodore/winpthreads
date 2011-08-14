@@ -34,7 +34,7 @@ struct _sem_t
 {
     unsigned int valid;
     HANDLE s;
-    volatile int value;
+    volatile long value;
     pthread_mutex_t vlock;
 };
 

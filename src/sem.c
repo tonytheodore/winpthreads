@@ -48,27 +48,25 @@ sem_init (sem_t *sem, int pshared, unsigned int value)
 {
   _sem_t *sv;
 
-  if (sem)
-    *sem = NULL;
   if (!sem || value > (unsigned int)SEM_VALUE_MAX)
     return sem_result (EINVAL);
   if (pshared != PTHREAD_PROCESS_PRIVATE)
     return sem_result (EPERM);
 
   if (!(sv = (sem_t) calloc (1,sizeof (*sv))))
-    return sem_result(ENOMEM); 
+    return sem_result (ENOMEM);
 
   sv->value = value;
-  if (pthread_mutex_init(&sv->vlock, NULL) != 0)
+  if (pthread_mutex_init (&sv->vlock, NULL) != 0)
     {
       free (sv);
-      return sem_result(ENOSPC);
+      return sem_result (ENOSPC);
     }
   if ((sv->s = CreateSemaphore (NULL, 0, SEM_VALUE_MAX, NULL)) == NULL)
     {
       pthread_mutex_destroy (&sv->vlock);
       free (sv);
-      return sem_result(ENOSPC); 
+      return sem_result (ENOSPC);
     }
 
   sv->valid = LIFE_SEM;
@@ -87,7 +85,7 @@ sem_destroy (sem_t *sem)
   if ((r = pthread_mutex_lock (&sv->vlock)) != 0)
     return sem_result (r);
 
-  if (sv->value < 0 || sv->valid == DEAD_SEM)
+  if (sv->value < 0)
     {
       pthread_mutex_unlock (&sv->vlock);
       return sem_result (EBUSY);
@@ -139,7 +137,7 @@ sem_trywait (sem_t *sem)
 {
   _sem_t *sv;
 
-  if (sem_std_enter (sem, &sv, 1) != 0)
+  if (sem_std_enter (sem, &sv, 0) != 0)
     return -1;
   if (sv->value <= 0)
     {
@@ -163,11 +161,12 @@ clean_wait_sem (void *s)
 {
   struct sSemTimedWait *p = (struct sSemTimedWait *) s;
   _sem_t *sv = NULL;
+
   if (sem_std_enter (p->p, &sv, 0) != 0)
     return;
 
   if (WaitForSingleObject (sv->s, 0) != WAIT_OBJECT_0)
-    InterlockedIncrement ((long *) &sv->value);
+    InterlockedIncrement (&sv->value);
   else if (p->ret)
     p->ret[0] = 0;
   pthread_mutex_unlock (&sv->vlock);
@@ -176,7 +175,8 @@ clean_wait_sem (void *s)
 int
 sem_wait (sem_t *sem)
 {
-  int cur_v, ret = 0;
+  long cur_v;
+  int ret = 0;
   _sem_t *sv;
   HANDLE semh;
   struct sSemTimedWait arg;
@@ -186,7 +186,7 @@ sem_wait (sem_t *sem)
 
   arg.ret = NULL;
   arg.p = sem;
-  InterlockedDecrement ((long *) &sv->value);
+  InterlockedDecrement (&sv->value);
   cur_v = sv->value;
   semh = sv->s;
   pthread_mutex_unlock (&sv->vlock);
@@ -218,15 +218,15 @@ sem_timedwait (sem_t *sem, const struct timespec *t)
   struct sSemTimedWait arg;
 
   if (!t)
-    return sem_wait(sem);
-  dwr = dwMilliSecs(_pthread_rel_time_in_ms(t));
+    return sem_wait (sem);
+  dwr = dwMilliSecs(_pthread_rel_time_in_ms (t));
 
   if (sem_std_enter (sem, &sv, 1) != 0)
     return -1;
 
   arg.ret = &ret;
   arg.p = sem;
-  InterlockedDecrement ((long *) &sv->value);
+  InterlockedDecrement (&sv->value);
   cur_v = sv->value;
   semh = sv->s;
   pthread_mutex_unlock(&sv->vlock);
@@ -241,9 +241,9 @@ sem_timedwait (sem_t *sem, const struct timespec *t)
       if (ret == EINVAL)
         ret = 0;
     }
+
   if (!ret)
     return 0;
-
   return sem_result (ret);
 }
 
@@ -260,18 +260,13 @@ sem_post (sem_t *sem)
       pthread_mutex_unlock (&sv->vlock);
       return sem_result (ERANGE);
     }
-  InterlockedIncrement ((long *)&sv->value);
-  if (sv->value > 0)
+  InterlockedIncrement (&sv->value);
+  if (sv->value > 0 || ReleaseSemaphore (sv->s, 1, NULL))
     {
       pthread_mutex_unlock (&sv->vlock);
       return 0;
     }
-  if (ReleaseSemaphore (sv->s, 1, NULL))
-    {
-      pthread_mutex_unlock (&sv->vlock);
-      return 0;
-    }
-  InterlockedDecrement ((long *) &sv->value);
+  InterlockedDecrement (&sv->value);
   pthread_mutex_unlock (&sv->vlock);
 
   return sem_result (EINVAL);
@@ -294,27 +289,26 @@ sem_post_multiple (sem_t *sem, int count)
     return sem_result (ERANGE);
   }
   waiters_count = -sv->value;
-  InterlockedExchangeAdd((long*)&sv->value, (long) count);
-  if (waiters_count <= 0)
+  sv->value += count;
+  /*InterlockedExchangeAdd((long*)&sv->value, (long) count);*/
+  if (waiters_count <= 0
+      || ReleaseSemaphore (sv->s,
+			   (waiters_count < count ? waiters_count
+			   			  : count), NULL))
   {
     pthread_mutex_unlock(&sv->vlock);
     return 0;
   }
-  if (ReleaseSemaphore (sv->s,
-			waiters_count < count ? waiters_count : count, NULL))
-  {
-    pthread_mutex_unlock(&sv->vlock);
-    return 0;
-  }
-  InterlockedExchangeAdd((long*)&sv->value, -((long) count));
+  /*InterlockedExchangeAdd((long*)&sv->value, -((long) count));*/
+  sv->value -= count;
   pthread_mutex_unlock(&sv->vlock);
-  return sem_result(EINVAL);
+  return sem_result (EINVAL);
 }
 
 sem_t *
 sem_open (const char *name, int oflag, mode_t mode, unsigned int value)
 {
-  sem_result(ENOSYS);
+  sem_result (ENOSYS);
   return NULL;
 }
 
@@ -344,13 +338,13 @@ sem_getvalue (sem_t *sem, int *sval)
 
   if ((r = pthread_mutex_lock (&sv->vlock)) != 0)
     return sem_result (r);
-  if (*sem == NULL || sv->valid == DEAD_SEM)
+  if (*sem == NULL)
     {
       pthread_mutex_unlock (&sv->vlock);
       return sem_result (EINVAL);
     }
 
-  *sval = sv->value;
+  *sval = (int) sv->value;
   pthread_mutex_unlock (&sv->vlock);
   return 0;  
 }
