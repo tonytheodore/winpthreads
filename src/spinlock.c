@@ -33,7 +33,7 @@ dec_test (long volatile *p)
 {
   unsigned char ret = 0;
   __asm__ __volatile__ ("lock\n\t"
-    "decl %1\n"
+    "subl $1,%1\n"
     "setz %0"
     : "+r" (ret), "+m" (*p)
     : : "memory");

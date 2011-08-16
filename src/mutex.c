@@ -205,12 +205,14 @@ mutex_static_init(pthread_mutex_t *m)
 
 static int pthread_mutex_lock_intern(pthread_mutex_t *m, DWORD timeout);
 
-int pthread_mutex_lock(pthread_mutex_t *m)
+int
+pthread_mutex_lock (pthread_mutex_t *m)
 {
   return pthread_mutex_lock_intern(m, INFINITE);
 }
 
-static int pthread_mutex_lock_intern(pthread_mutex_t *m, DWORD timeout)
+static int
+pthread_mutex_lock_intern (pthread_mutex_t *m, DWORD timeout)
 {
     mutex_t *_m;
     int r;
@@ -241,79 +243,6 @@ static int pthread_mutex_lock_intern(pthread_mutex_t *m, DWORD timeout)
     }
     return mutex_unref(m,r);
 
-}
-
-/*	
-    See this article: http://msdn.microsoft.com/nl-nl/magazine/cc164040(en-us).aspx#S8
-    Unfortunately, behaviour has changed in Win 7 and maybe Vista (untested). Who said
-    "undocumented"? Some testing and tracing revealed the following:
-    On Win 7:
-    - LockCount is DECREMENTED with 4. The low bit(0) is set when the cs is unlocked. 
-      Also bit(1) is set, so lock sequence goes like -2,-6, -10 ... etc.
-    - The LockSemaphore event is only auto-initialized at contention. 
-      Although pthread_mutex_timedlock() seemed to work, it just busy-waits, because
-      WaitForSingleObject() always returns WAIT_FAILED+INVALID_HANDLE. 
-    Solution on Win 7:
-    - The LockSemaphore member MUST be auto-initialized and only at contention. 
-      Pre-initializing messes up the cs state (causes EnterCriticalSection() to hang)
-    - Before the lock (wait): 
-      - auto-init LockSemaphore
-      - LockCount is DECREMENTED with 4
-    - Data members must be also correctly updated when the lock is obtained, after
-      waiting on the event:
-      - Increment LockCount, setting the low bit
-      - set RecursionCount to 1
-      - set OwningThread to CurrentThreadId()
-    - When the wait failed or timed out, reset LockCount (INCREMENT with 4)
-    On Win XP (2000): (untested)
-    - LockCount is updated with +1 as documented in the article,
-      so lock sequence goes like -1, 0, 1, 2 ... etc.
-    - The event is obviously also auto-initialized in TryEnterCriticalSection. That is, 
-      we hope so, otherwise the original implementation never worked correctly in the
-      first place (just busy-waits, munching precious CPU time).
-    - Data members are also correctly updated in TryEnterCriticalSection. Same
-      hope / assumption here.
-    We do an one-time test lock and draw conclusions based on the resulting value
-    of LockCount: 0=XP behaviour, -2=Win 7 behaviour. Also crossing fingers helps.
-*/
-static LONG LockDelta	= -4; /* Win 7 default */
-
-static inline int _InitWaitCriticalSection(RTL_CRITICAL_SECTION *prc)
-{
-    int r = 0;
-    HANDLE evt;
-    LONG LockCount = prc->LockCount;
-
-    r = 0;
-    if (!prc->OwningThread || !prc->RecursionCount || (LockCount & 1)) {
-        /* not locked (anymore), caller should redo trylock sequence: */
-        return EAGAIN;
-    } else {
-        _ReadWriteBarrier();
-        if( LockCount != InterlockedCompareExchange(&prc->LockCount, LockCount+LockDelta, LockCount) ) {
-            /* recheck here too: */
-            return EAGAIN;
-        }
-    }
-
-    if ( !prc->LockSemaphore) {
-        if (!(evt =  CreateEvent(NULL,FALSE,FALSE,NULL)) ) {
-            InterlockedExchangeAdd(&prc->LockCount, -LockDelta);
-            return ENOMEM;
-        }
-        if(InterlockedCompareExchangePointer(&prc->LockSemaphore,evt,NULL)) {
-            /* someone sneaked in between, keep the original: */
-            CloseHandle(evt);
-        }
-    }
-
-    return r;
-}
-
-/* the wait failed, so we have to restore the LockCount member */
-static inline void _UndoWaitCriticalSection(RTL_CRITICAL_SECTION *prc)
-{
-        InterlockedExchangeAdd(&prc->LockCount, -LockDelta);
 }
 
 int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *ts)
@@ -402,12 +331,6 @@ int pthread_mutex_trylock(pthread_mutex_t *m)
     return mutex_unref(m,_mutex_trylock(m));
 }
 
-static LONG InitOnce	= 1;
-static void _mutex_init_once(mutex_t *m)
-{
-  ;
-}
-
 int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
 {
     mutex_t *_m;
@@ -421,13 +344,20 @@ int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
     _m->type = PTHREAD_MUTEX_DEFAULT;
     _m->count = 0;
 
-    if (a) {
+    if (a)
+      {
         int share = PTHREAD_PROCESS_SHARED;
-        r = pthread_mutexattr_gettype(a, &_m->type);
-        if (!r) r = pthread_mutexattr_getpshared(a, &share);
-        if (!r && share == PTHREAD_PROCESS_SHARED) r = ENOSYS;
-    }
-    if (!r) {
+        r = pthread_mutexattr_gettype (a, &_m->type);
+        if (!r)
+          r = pthread_mutexattr_getpshared(a, &share);
+        if (!r && share == PTHREAD_PROCESS_SHARED)
+          {
+	    fprintf (stderr, "share %d != PTHREAD_PROCESS_SHARED\n", share);
+	    r = ENOSYS;
+	  }
+      }
+    if (!r)
+    {
         if ((_m->h = CreateSemaphore(NULL, 1, 0x7fffffff, NULL)) == NULL)
         {
             switch (GetLastError()) {
@@ -446,8 +376,6 @@ int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
         *m = NULL;
         return r;
     }
-    if (InterlockedExchange(&InitOnce, 0))
-	    _mutex_init_once(_m);
     _m->valid = LIFE_MUTEX;
     *m = _m;
 
@@ -523,6 +451,7 @@ int pthread_mutexattr_setpshared(pthread_mutexattr_t * a, int type)
     {
       type = PTHREAD_PROCESS_PRIVATE;
       r = ENOSYS;
+      fprintf (stderr, "Set private $$$$\n");
     }
     type = (type == PTHREAD_PROCESS_SHARED ? 4 : 0);
 
