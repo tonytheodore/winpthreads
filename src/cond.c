@@ -120,6 +120,59 @@ int pthread_condattr_getpshared(const pthread_condattr_t *a, int *s)
   return 0;
 }
 
+int
+pthread_condattr_getclock (const pthread_condattr_t *a, clockid_t *clock_id)
+{
+  if (!a || !clock_id)
+    return EINVAL;
+  *clock_id = 0;
+  return 0;
+}
+
+int
+pthread_condattr_setclock(pthread_condattr_t *a, clockid_t clock_id)
+{
+  if (!a || clock_id != 0)
+    return EINVAL;
+  return 0;
+}
+
+extern int pthread_delay_np_ms (DWORD to);
+
+int
+__pthread_clock_nanosleep (clockid_t clock_id, int flags, const struct timespec *rqtp,
+			   struct timespec *rmtp)
+{
+  unsigned long long tick, tick2;
+  unsigned long long delay;
+  DWORD dw;
+
+  if (clock_id != CLOCK_REALTIME
+      && clock_id != CLOCK_MONOTONIC
+      && clock_id != CLOCK_PROCESS_CPUTIME_ID)
+   return EINVAL;
+  if ((flags & TIMER_ABSTIME) != 0)
+    delay = _pthread_rel_time_in_ms (rqtp);
+  else
+    delay = _pthread_time_in_ms_from_timespec (rqtp);
+  do
+    {
+      dw = (DWORD) (delay >= 99999ULL ? 99999ULL : delay);
+      tick = _pthread_time_in_ms ();
+      pthread_delay_np_ms (dw);
+      tick2 = _pthread_time_in_ms ();
+      tick2 -= tick;
+      if (tick2 >= delay)
+        delay = 0;
+      else
+        delay -= tick2;
+    }
+  while (delay != 0ULL);
+  if (rmtp)
+    memset (rmtp, 0, sizeof (*rmtp));
+  return 0;
+}
+
 int pthread_condattr_setpshared(pthread_condattr_t *a, int s)
 {
   if (!a || (s != PTHREAD_PROCESS_SHARED && s != PTHREAD_PROCESS_PRIVATE))

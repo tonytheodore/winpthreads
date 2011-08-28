@@ -542,6 +542,29 @@ pthread_delay_np (const struct timespec *interval)
   return 0;
 }
 
+int pthread_delay_np_ms (DWORD to);
+
+int
+pthread_delay_np_ms (DWORD to)
+{
+  struct _pthread_v *s = __pthread_self_lite ();
+
+  if (!to)
+    {
+      pthread_testcancel ();
+      Sleep (0);
+      pthread_testcancel ();
+      return 0;
+    }
+  pthread_testcancel ();
+  if (s->evStart)
+    WaitForSingleObject (s->evStart, to);
+  else
+    Sleep (to);
+  pthread_testcancel ();
+  return 0;
+}
+
 /* Compatibility routine for pthread-win32.  It returns the
    amount of available CPUs on system.  */
 int
@@ -1608,3 +1631,19 @@ pthread_detach (pthread_t t)
 
   return r;
 }
+
+static dummy_concurrency_level = 0;
+
+int
+pthread_getconcurrency (void)
+{
+  return dummy_concurrency_level;
+}
+
+int
+pthread_setconcurrency (int new_level)
+{
+  dummy_concurrency_level = new_level;
+  return 0;
+}
+

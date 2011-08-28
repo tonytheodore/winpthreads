@@ -81,7 +81,9 @@ sem_t s;
 void *
 thr (void * arg)
 {
-  assert(sem_wait(&s) == 0);
+  int r = sem_wait (&s);
+  fprintf (stderr, "r = %d %d EINVAL %d\n", r, errno, EINVAL);
+  assert(r == 0);
   return NULL;
 }
 

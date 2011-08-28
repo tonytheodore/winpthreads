@@ -115,7 +115,7 @@ main()
 //			printf("Value = %d\n", value);	fflush(stdout);
 			assert(-value == i);
 		}
-
+  fprintf (stderr, "Complete\n"); fflush (stderr);
   return 0;
 }
 

@@ -154,8 +154,6 @@ int    WINPTHREAD_API pthread_set_num_processors_np(int n);
 #define pthread_atfork(F1,F2,F3) 0
 
 /* unsupported stuff: */
-#define pthread_condattr_getclock(A, C) ENOTSUP
-#define pthread_condattr_setclock(A, C) ENOTSUP
 #define pthread_mutex_getprioceiling(M, P) ENOTSUP
 #define pthread_mutex_setprioceiling(M, P) ENOTSUP
 #define pthread_getcpuclockid(T, C) ENOTSUP
@@ -360,11 +358,41 @@ int WINPTHREAD_API pthread_mutexattr_getprotocol(const pthread_mutexattr_t *a, i
 int WINPTHREAD_API pthread_mutexattr_setprotocol(pthread_mutexattr_t *a, int type);
 int WINPTHREAD_API pthread_mutexattr_getprioceiling(const pthread_mutexattr_t *a, int * prio);
 int WINPTHREAD_API pthread_mutexattr_setprioceiling(pthread_mutexattr_t *a, int prio);
+int WINPTHREAD_API pthread_getconcurrency(void);
+int WINPTHREAD_API pthread_setconcurrency(int new_level);
 
 int WINPTHREAD_API pthread_condattr_destroy(pthread_condattr_t *a);
 int WINPTHREAD_API pthread_condattr_init(pthread_condattr_t *a);
 int WINPTHREAD_API pthread_condattr_getpshared(const pthread_condattr_t *a, int *s);
 int WINPTHREAD_API pthread_condattr_setpshared(pthread_condattr_t *a, int s);
+
+typedef int clockid_t;
+/* System-wide realtime clock. Setting this clock requires appropriate
+   privileges. */
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME 0
+#endif
+/* Clock that cannot be set and represents monotonic time since some
+   unspecified starting point. */
+#ifndef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC 1
+#endif
+/* High-resolution per-process timer from the CPU. */
+#ifndef CLOCK_PROCESS_CPUTIME_ID
+#define CLOCK_PROCESS_CPUTIME_ID 2
+#endif
+
+int WINPTHREAD_API pthread_condattr_getclock (const pthread_condattr_t *attr,
+       clockid_t *clock_id);
+int WINPTHREAD_API pthread_condattr_setclock(pthread_condattr_t *attr,
+       clockid_t clock_id);
+int WINPTHREAD_API __pthread_clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *rqtp, struct timespec *rmtp);
+#ifndef clock_nanosleep
+#define clock_nanosleep __pthread_clock_nanosleep
+#endif
+#ifndef TIMER_ABSTIME
+#define TIMER_ABSTIME 1
+#endif
 
 int WINPTHREAD_API pthread_barrierattr_init(void **attr);
 int WINPTHREAD_API pthread_barrierattr_destroy(void **attr);
@@ -388,6 +416,246 @@ int                        WINPTHREAD_API pthread_rwlockattr_destroy(pthread_rwl
 int                        WINPTHREAD_API pthread_rwlockattr_getpshared(pthread_rwlockattr_t *a, int *s);
 int                        WINPTHREAD_API pthread_rwlockattr_init(pthread_rwlockattr_t *a);
 int                        WINPTHREAD_API pthread_rwlockattr_setpshared(pthread_rwlockattr_t *a, int s);
+
+/* Recursive API emulation.  */
+#undef localtime_r
+#define localtime_r(_Time, _Tm) ({ struct tm *___tmp_tm;                \
+						pthread_testcancel();   \
+                                                tm = localtime((_Time));\
+                                                if (___tmp_tm) {        \
+                                                  *(_Tm) = *___tmp_tm;  \
+                                                  ___tmp_tm = (_Tm);    \
+                                                }                       \
+                                                ___tmp_tm;      })
+
+#undef gmtime_r
+#define gmtime_r(_Time,_Tm)     ({ struct tm *___tmp_tm;                \
+						pthread_testcancel();   \
+                                                tm = gmtime((_Time));   \
+                                                if (___tmp_tm) {        \
+                                                  *(_Tm) = *___tmp_tm;  \
+                                                  ___tmp_tm = (_Tm);    \
+                                                }                       \
+                                                ___tmp_tm;      })
+
+#undef ctime_r
+#define ctime_r(_Time,_Str)     ({ char *___tmp_tm;    			   \
+						pthread_testcancel();   \
+                                                ___tmp_tm = ctime((_Time));\
+                                                if (___tmp_tm)          \
+                                                 ___tmp_tm =            \
+                                                   strcpy((_Str),___tmp_tm); \
+                                                ___tmp_tm;      })
+
+#undef asctime_r
+#define asctime_r(_Tm, _Buf)    ({ char *___tmp_tm;   			\
+						pthread_testcancel();   \
+						___tmp_tm = asctime((_Tm));\
+                                                if (___tmp_tm)          \
+                                                 ___tmp_tm =            \
+                                                   strcpy((_Buf),___tmp_tm);\
+                                                ___tmp_tm;      })
+
+#ifndef strtok_r
+#define strtok_r(__s, __sep, __last)  (*(__last) = strtok((__s), (__sep)))
+#endif
+#ifndef rand_r
+#define rand_r(__seed) (__seed == __seed ? rand () : rand ())
+#endif
+
+#ifndef SIG_BLOCK
+#define SIG_BLOCK 0
+#endif
+#ifndef SIG_UNBLOCK
+#define SIG_UNBLOCK 1
+#endif
+#ifndef SIG_SETMASK
+#define SIG_SETMASK 2
+#endif
+
+/* Set defines described by the POSIX Threads Extension (1003.1c-1995) */
+/* _SC_THREADS
+  Basic support for POSIX threads is available. The functions
+
+  pthread_atfork(),
+  pthread_attr_destroy(),
+  pthread_attr_getdetachstate(),
+  pthread_attr_getschedparam(),
+  pthread_attr_init(),
+  pthread_attr_setdetachstate(),
+  pthread_attr_setschedparam(),
+  pthread_cancel(),
+  pthread_cleanup_push(),
+  pthread_cleanup_pop(),
+  pthread_cond_broadcast(),
+  pthread_cond_destroy(),
+  pthread_cond_init(),
+  pthread_cond_signal(),
+  pthread_cond_timedwait(),
+  pthread_cond_wait(),
+  pthread_condattr_destroy(),
+  pthread_condattr_init(),
+  pthread_create(),
+  pthread_detach(),
+  pthread_equal(),
+  pthread_exit(),
+  pthread_getspecific(),
+  pthread_join(,
+  pthread_key_create(),
+  pthread_key_delete(),
+  pthread_mutex_destroy(),
+  pthread_mutex_init(),
+  pthread_mutex_lock(),
+  pthread_mutex_trylock(),
+  pthread_mutex_unlock(),
+  pthread_mutexattr_destroy(),
+  pthread_mutexattr_init(),
+  pthread_once(),
+  pthread_rwlock_destroy(),
+  pthread_rwlock_init(),
+  pthread_rwlock_rdlock(),
+  pthread_rwlock_tryrdlock(),
+  pthread_rwlock_trywrlock(),
+  pthread_rwlock_unlock(),
+  pthread_rwlock_wrlock(),
+  pthread_rwlockattr_destroy(),
+  pthread_rwlockattr_init(),
+  pthread_self(),
+  pthread_setcancelstate(),
+  pthread_setcanceltype(),
+  pthread_setspecific(),
+  pthread_testcancel()
+
+  are present. */
+#undef _POSIX_THREADS
+#define _POSIX_THREADS 200112L
+
+/* _SC_READER_WRITER_LOCKS
+  This option implies the _POSIX_THREADS option. Conversely, under
+  POSIX 1003.1-2001 the _POSIX_THREADS option implies this option.
+
+  The functions
+  pthread_rwlock_destroy(),
+  pthread_rwlock_init(),
+  pthread_rwlock_rdlock(),
+  pthread_rwlock_tryrdlock(),
+  pthread_rwlock_trywrlock(),
+  pthread_rwlock_unlock(),
+  pthread_rwlock_wrlock(),
+  pthread_rwlockattr_destroy(),
+  pthread_rwlockattr_init()
+
+  are present.
+*/
+#undef _POSIX_READER_WRITER_LOCKS
+#define _POSIX_READER_WRITER_LOCKS 200112L
+
+/* _SC_SPIN_LOCKS
+  This option implies the _POSIX_THREADS and _POSIX_THREAD_SAFE_FUNCTIONS
+  options. The functions
+
+  pthread_spin_destroy(),
+  pthread_spin_init(),
+  pthread_spin_lock(),
+  pthread_spin_trylock(),
+  pthread_spin_unlock()
+
+  are present. */
+#undef _POSIX_SPIN_LOCKS
+#define _POSIX_SPIN_LOCKS 200112L
+
+/* _SC_BARRIERS
+  This option implies the _POSIX_THREADS and _POSIX_THREAD_SAFE_FUNCTIONS
+  options. The functions
+
+  pthread_barrier_destroy(),
+  pthread_barrier_init(),
+  pthread_barrier_wait(),
+  pthread_barrierattr_destroy(),
+  pthread_barrierattr_init()
+
+  are present.
+*/
+#undef _POSIX_BARRIERS
+#define _POSIX_BARRIERS 200112L
+
+/* _SC_THREAD_SAFE_FUNCTIONS
+  Affected functions are
+
+  readdir_r(),
+  getgrgid_r(),
+  getgrnam_r(),
+  getpwnam_r(),
+  getpwuid_r(),
+  flockfile(),
+  ftrylockfile(),
+  funlockfile(),
+  getc_unlocked(),
+  getchar_unlocked(),
+  putc_unlocked(),
+  putchar_unlocked(),
+  strerror_r(),
+*/
+#undef _POSIX_THREAD_SAFE_FUNCTIONS
+#define _POSIX_THREAD_SAFE_FUNCTIONS 200112L
+
+/* _SC_TIMEOUTS
+  The functions
+
+  mq_timedreceive(), - not supported
+  mq_timedsend(), - not supported
+  posix_trace_timedgetnext_event(), - not supported
+  pthread_mutex_timedlock(),
+  pthread_rwlock_timedrdlock(),
+  pthread_rwlock_timedwrlock(),
+  sem_timedwait(),
+
+  are present. */
+#undef _POSIX_TIMEOUTS
+#define _POSIX_TIMEOUTS 200112L
+
+/* _SC_TIMERS - not supported
+  The functions
+
+  clock_getres(),
+  clock_gettime(),
+  clock_settime(),
+  nanosleep(),
+  timer_create(),
+  timer_delete(),
+  timer_gettime(),
+  timer_getoverrun(),
+  timer_settime()
+
+  are present.  */
+/* #undef _POSIX_TIMERS */
+
+/* _SC_CLOCK_SELECTION
+   This option implies the _POSIX_TIMERS option. The functions
+
+   pthread_condattr_getclock(),
+   pthread_condattr_setclock(),
+   clock_nanosleep()
+
+   are present.
+*/
+#undef _POSIX_CLOCK_SELECTION
+#define _POSIX_CLOCK_SELECTION 200112
+
+#undef _POSIX_THREAD_DESTRUCTOR_ITERATIONS
+#define _POSIX_THREAD_DESTRUCTOR_ITERATIONS     PTHREAD_DESTRUCTOR_ITERATIONS
+
+#undef _POSIX_THREAD_KEYS_MAX
+#define _POSIX_THREAD_KEYS_MAX                  PTHREAD_KEYS_MAX
+
+#undef PTHREAD_THREADS_MAX
+#define PTHREAD_THREADS_MAX                     2019
+
+#undef _POSIX_SEM_NSEMS_MAX
+#define _POSIX_SEM_NSEMS_MAX                    256
+
+#undef SEM_NSEMS_MAX
+#define SEM_NSEMS_MAX                           1024
 
 /* Wrap cancellation points.  */
 #ifdef __WINPTRHEAD_ENABLE_WRAP_API
@@ -439,7 +707,6 @@ int                        WINPTHREAD_API pthread_rwlockattr_setpshared(pthread_
 #define system(...) (pthread_testcancel(), system(__VA_ARGS__))
 #define access(...) (pthread_testcancel(), access(__VA_ARGS__))
 #define asctime(...) (pthread_testcancel(), asctime(__VA_ARGS__))
-#define asctime_r(...) (pthread_testcancel(), asctime_r(__VA_ARGS__))
 #define catclose(...) (pthread_testcancel(), catclose(__VA_ARGS__))
 #define catgets(...) (pthread_testcancel(), catgets(__VA_ARGS__))
 #define catopen(...) (pthread_testcancel(), catopen(__VA_ARGS__))
@@ -447,7 +714,6 @@ int                        WINPTHREAD_API pthread_rwlockattr_setpshared(pthread_
 #define closelog(...) (pthread_testcancel(), closelog(__VA_ARGS__))
 #define ctermid(...) (pthread_testcancel(), ctermid(__VA_ARGS__))
 #define ctime(...) (pthread_testcancel(), ctime(__VA_ARGS__))
-#define ctime_r(...) (pthread_testcancel(), ctime_r(__VA_ARGS__))
 #define dbm_close(...) (pthread_testcancel(), dbm_close(__VA_ARGS__))
 #define dbm_delete(...) (pthread_testcancel(), dbm_delete(__VA_ARGS__))
 #define dbm_fetch(...) (pthread_testcancel(), dbm_fetch(__VA_ARGS__))
@@ -541,7 +807,6 @@ int                        WINPTHREAD_API pthread_rwlockattr_setpshared(pthread_
 #define ioctl(...) (pthread_testcancel(), ioctl(__VA_ARGS__))
 #define link(...) (pthread_testcancel(), link(__VA_ARGS__))
 #define localtime(...) (pthread_testcancel(), localtime(__VA_ARGS__))
-#define localtime_r(...) (pthread_testcancel(), localtime_r(__VA_ARGS__))
 #define lseek(...) (pthread_testcancel(), lseek(__VA_ARGS__))
 #define lstat(...) (pthread_testcancel(), lstat(__VA_ARGS__))
 #define mkstemp(...) (pthread_testcancel(), mkstemp(__VA_ARGS__))
