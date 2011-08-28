@@ -89,9 +89,15 @@ extern "C" {
 #define RWLS_PER_THREAD						8
 
 /* Error-codes.  */
+#ifndef ETIMEDOUT
 #define ETIMEDOUT	110
+#endif
+#ifndef ENOTSUP
 #define ENOTSUP		134
-#define EWOULDBLOCK	EAGAIN     
+#endif
+#ifndef EWOULDBLOCK
+#define EWOULDBLOCK	EAGAIN
+#endif
 
 /* pthread specific defines.  */
 
