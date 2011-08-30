@@ -34,7 +34,7 @@ unsigned long long _pthread_time_in_ms(void)
 unsigned long long _pthread_time_in_ms_from_timespec(const struct timespec *ts)
 {
     unsigned long long t = (unsigned long long) ts->tv_sec * 1000LL;
-    t += (unsigned long long) ts->tv_nsec / 1000000ULL;
+    t += (unsigned long long) (ts->tv_nsec / 1000000);
 
     return t;
 }
