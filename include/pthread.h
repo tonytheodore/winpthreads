@@ -648,6 +648,23 @@ int                        WINPTHREAD_API pthread_rwlockattr_setpshared(pthread_
 #undef _POSIX_CLOCK_SELECTION
 #define _POSIX_CLOCK_SELECTION 200112
 
+/* _SC_SEMAPHORES
+  The include file <semaphore.h> is present. The functions
+
+  sem_close(),
+  sem_destroy(),
+  sem_getvalue(),
+  sem_init(),
+  sem_open(),
+  sem_post(),
+  sem_trywait(),
+  sem_unlink(),
+  sem_wait()
+
+  are present. */
+#undef _POSIX_SEMAPHORES
+#define _POSIX_SEMAPHORES 200112
+
 #undef _POSIX_THREAD_DESTRUCTOR_ITERATIONS
 #define _POSIX_THREAD_DESTRUCTOR_ITERATIONS     PTHREAD_DESTRUCTOR_ITERATIONS
 
