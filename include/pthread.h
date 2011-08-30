@@ -73,7 +73,7 @@
 extern "C" {
 #endif
 
-#if defined DLL_EXPORT && !defined (WINPTHREAD_EXPORT_ALL_DEBUG)
+#if defined DLL_EXPORT
 #ifdef IN_WINPTHREAD
 #define WINPTHREAD_API __declspec(dllexport)
 #else

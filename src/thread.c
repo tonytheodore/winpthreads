@@ -27,6 +27,7 @@
 #include "thread.h"
 #include "misc.h"
 #include "spinlock.h"
+#include "winpthread_internal.h"
 
 static _pthread_v *__pthread_self_lite (void);
 

@@ -615,8 +615,6 @@ ac_includes_default="\
 ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
-EXPORT_ALL_SYMBOLS_FALSE
-EXPORT_ALL_SYMBOLS_TRUE
 LIBOBJS
 COPY_STATIC_FALSE
 COPY_STATIC_TRUE
@@ -749,7 +747,6 @@ enable_fast_install
 with_gnu_ld
 with_sysroot
 enable_libtool_lock
-enable_debug_exports
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1390,8 +1387,6 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
-  --enable-debug-exports  Export all symbols, including internal symbols for
-                          debugging, not recommended for production use
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -11933,26 +11928,6 @@ fi
 done
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking if internal symbols should be exported" >&5
-$as_echo_n "checking if internal symbols should be exported... " >&6; }
-# Check whether --enable-debug-exports was given.
-if test "${enable_debug_exports+set}" = set; then :
-  enableval=$enable_debug_exports;
-else
-  enable_export_all_symbols=no
-fi
-
- if test "x$enable_debug_exports" = xyes; then
-  EXPORT_ALL_SYMBOLS_TRUE=
-  EXPORT_ALL_SYMBOLS_FALSE='#'
-else
-  EXPORT_ALL_SYMBOLS_TRUE='#'
-  EXPORT_ALL_SYMBOLS_FALSE=
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $enable_debug_exports" >&5
-$as_echo "$enable_debug_exports" >&6; }
-
 ac_config_files="$ac_config_files Makefile"
 
 cat >confcache <<\_ACEOF
@@ -12090,10 +12065,6 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${COPY_STATIC_TRUE}" && test -z "${COPY_STATIC_FALSE}"; then
   as_fn_error $? "conditional \"COPY_STATIC\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${EXPORT_ALL_SYMBOLS_TRUE}" && test -z "${EXPORT_ALL_SYMBOLS_FALSE}"; then
-  as_fn_error $? "conditional \"EXPORT_ALL_SYMBOLS\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

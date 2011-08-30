@@ -43,14 +43,5 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([ftime gettimeofday memset])
 
-AC_MSG_CHECKING([if internal symbols should be exported])
-AC_ARG_ENABLE([debug-exports],
-  [AS_HELP_STRING([--enable-debug-exports],
-    [Export all symbols, including internal symbols for debugging, not recommended for production use])],
-  [],
-  [enable_export_all_symbols=no])
-AM_CONDITIONAL([EXPORT_ALL_SYMBOLS], [test "x$enable_debug_exports" = xyes])
-AC_MSG_RESULT([$enable_debug_exports])
-
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
