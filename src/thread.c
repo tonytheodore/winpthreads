@@ -1632,7 +1632,7 @@ pthread_detach (pthread_t t)
   return r;
 }
 
-static dummy_concurrency_level = 0;
+static int dummy_concurrency_level = 0;
 
 int
 pthread_getconcurrency (void)
