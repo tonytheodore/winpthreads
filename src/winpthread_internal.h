@@ -23,4 +23,5 @@
 #ifndef WINPTHREAD_INTERNAL_H
 #define WINPTHREAD_INTERNAL_H
 struct _pthread_v * WINPTHREAD_API __pth_gpointer_locked (pthread_t id);
+int pthread_delay_np_ms (DWORD to);
 #endif /*WINPTHREAD_INTERNAL_H*/

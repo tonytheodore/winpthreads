@@ -90,8 +90,11 @@ libpthread_dll_a_AR = $(AR) $(ARFLAGS)
 libpthread_dll_a_LIBADD =
 libpthread_dll_a_SOURCES = libpthread.dll.c
 libpthread_dll_a_OBJECTS = libpthread.dll.$(OBJEXT)
-LTLIBRARIES = $(lib_LTLIBRARIES)
-libwinpthread_la_LIBADD =
+LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
+libdummy_la_LIBADD =
+am_libdummy_la_OBJECTS = dummy.lo
+libdummy_la_OBJECTS = $(am_libdummy_la_OBJECTS)
+libwinpthread_la_DEPENDENCIES = libdummy.la
 am__dirstamp = $(am__leading_dot)dirstamp
 am_libwinpthread_la_OBJECTS = src/libwinpthread_la-barrier.lo \
 	src/libwinpthread_la-cond.lo src/libwinpthread_la-misc.lo \
@@ -99,7 +102,8 @@ am_libwinpthread_la_OBJECTS = src/libwinpthread_la-barrier.lo \
 	src/libwinpthread_la-spinlock.lo \
 	src/libwinpthread_la-thread.lo src/libwinpthread_la-ref.lo \
 	src/libwinpthread_la-sem.lo src/libwinpthread_la-sched.lo \
-	src/version.lo
+	src/libwinpthread_la-clock.lo \
+	src/libwinpthread_la-nanosleep.lo src/version.lo
 libwinpthread_la_OBJECTS = $(am_libwinpthread_la_OBJECTS)
 libwinpthread_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -117,8 +121,9 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = libpthread.c libpthread.dll.c $(libwinpthread_la_SOURCES)
-DIST_SOURCES = libpthread.c libpthread.dll.c \
+SOURCES = libpthread.c libpthread.dll.c $(libdummy_la_SOURCES) \
+	$(libwinpthread_la_SOURCES)
+DIST_SOURCES = libpthread.c libpthread.dll.c $(libdummy_la_SOURCES) \
 	$(libwinpthread_la_SOURCES)
 HEADERS = $(include_HEADERS)
 ETAGS = etags
@@ -258,16 +263,20 @@ ACLOCAL_AMFLAGS = -I m4
 lib_LTLIBRARIES = libwinpthread.la
 lib_LIBRARIES = $(am__append_1) $(am__append_2)
 libwinpthread_la_CPPFLAGS = -I$(srcdir)/include -DIN_WINPTHREAD
-libwinpthread_la_LDFLAGS = -no-undefined -version-info 1:0:0
+libwinpthread_la_LDFLAGS = -no-undefined -version-info 1:0:0 -L.
 # -export-symbols-regex '^(pthread|sem|sched)_' ?
 libwinpthread_la_SOURCES = \
   src/barrier.h  src/cond.h  src/misc.h  src/mutex.h  src/rwlock.h  src/spinlock.h  src/thread.h  src/ref.h  src/sem.h \
   src/barrier.c  src/cond.c  src/misc.c  src/mutex.c  src/rwlock.c  src/spinlock.c  src/thread.c  src/ref.c  src/sem.c  src/sched.c \
-  src/winpthread_internal.h  src/version.rc
+  src/winpthread_internal.h  src/clock.c src/nanosleep.c src/version.rc
 
-include_HEADERS = include/pthread.h include/sched.h include/semaphore.h include/pthread_unistd.h
+include_HEADERS = include/pthread.h include/sched.h include/semaphore.h include/pthread_unistd.h include/pthread_time.h
 DISTCHECK_CONFIGURE_FLAGS = --host=$(host_triplet)
-all: config.h
+noinst_LTLIBRARIES = libdummy.la
+libwinpthread_la_LIBADD = libdummy.la
+BUILT_SOURCES = dummy.c
+libdummy_la_SOURCES = dummy.c
+all: $(BUILT_SOURCES) config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
@@ -394,6 +403,17 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+
+clean-noinstLTLIBRARIES:
+	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
+	@list='$(noinst_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test "$$dir" != "$$p" || dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
+	done
+libdummy.la: $(libdummy_la_OBJECTS) $(libdummy_la_DEPENDENCIES) 
+	$(LINK)  $(libdummy_la_OBJECTS) $(libdummy_la_LIBADD) $(LIBS)
 src/$(am__dirstamp):
 	@$(MKDIR_P) src
 	@: > src/$(am__dirstamp)
@@ -420,6 +440,10 @@ src/libwinpthread_la-sem.lo: src/$(am__dirstamp) \
 	src/$(DEPDIR)/$(am__dirstamp)
 src/libwinpthread_la-sched.lo: src/$(am__dirstamp) \
 	src/$(DEPDIR)/$(am__dirstamp)
+src/libwinpthread_la-clock.lo: src/$(am__dirstamp) \
+	src/$(DEPDIR)/$(am__dirstamp)
+src/libwinpthread_la-nanosleep.lo: src/$(am__dirstamp) \
+	src/$(DEPDIR)/$(am__dirstamp)
 src/version.lo: src/$(am__dirstamp) src/$(DEPDIR)/$(am__dirstamp)
 libwinpthread.la: $(libwinpthread_la_OBJECTS) $(libwinpthread_la_DEPENDENCIES) 
 	$(libwinpthread_la_LINK) -rpath $(libdir) $(libwinpthread_la_OBJECTS) $(libwinpthread_la_LIBADD) $(LIBS)
@@ -428,12 +452,16 @@ mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 	-rm -f src/libwinpthread_la-barrier.$(OBJEXT)
 	-rm -f src/libwinpthread_la-barrier.lo
+	-rm -f src/libwinpthread_la-clock.$(OBJEXT)
+	-rm -f src/libwinpthread_la-clock.lo
 	-rm -f src/libwinpthread_la-cond.$(OBJEXT)
 	-rm -f src/libwinpthread_la-cond.lo
 	-rm -f src/libwinpthread_la-misc.$(OBJEXT)
 	-rm -f src/libwinpthread_la-misc.lo
 	-rm -f src/libwinpthread_la-mutex.$(OBJEXT)
 	-rm -f src/libwinpthread_la-mutex.lo
+	-rm -f src/libwinpthread_la-nanosleep.$(OBJEXT)
+	-rm -f src/libwinpthread_la-nanosleep.lo
 	-rm -f src/libwinpthread_la-ref.$(OBJEXT)
 	-rm -f src/libwinpthread_la-ref.lo
 	-rm -f src/libwinpthread_la-rwlock.$(OBJEXT)
@@ -452,12 +480,15 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dummy.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpthread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpthread.dll.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-barrier.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-clock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-cond.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-misc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-mutex.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-nanosleep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-ref.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-rwlock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/libwinpthread_la-sched.Plo@am__quote@
@@ -558,6 +589,20 @@ src/libwinpthread_la-sched.lo: src/sched.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/sched.c' object='src/libwinpthread_la-sched.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwinpthread_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o src/libwinpthread_la-sched.lo `test -f 'src/sched.c' || echo '$(srcdir)/'`src/sched.c
+
+src/libwinpthread_la-clock.lo: src/clock.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwinpthread_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT src/libwinpthread_la-clock.lo -MD -MP -MF src/$(DEPDIR)/libwinpthread_la-clock.Tpo -c -o src/libwinpthread_la-clock.lo `test -f 'src/clock.c' || echo '$(srcdir)/'`src/clock.c
+@am__fastdepCC_TRUE@	$(am__mv) src/$(DEPDIR)/libwinpthread_la-clock.Tpo src/$(DEPDIR)/libwinpthread_la-clock.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/clock.c' object='src/libwinpthread_la-clock.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwinpthread_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o src/libwinpthread_la-clock.lo `test -f 'src/clock.c' || echo '$(srcdir)/'`src/clock.c
+
+src/libwinpthread_la-nanosleep.lo: src/nanosleep.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwinpthread_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT src/libwinpthread_la-nanosleep.lo -MD -MP -MF src/$(DEPDIR)/libwinpthread_la-nanosleep.Tpo -c -o src/libwinpthread_la-nanosleep.lo `test -f 'src/nanosleep.c' || echo '$(srcdir)/'`src/nanosleep.c
+@am__fastdepCC_TRUE@	$(am__mv) src/$(DEPDIR)/libwinpthread_la-nanosleep.Tpo src/$(DEPDIR)/libwinpthread_la-nanosleep.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/nanosleep.c' object='src/libwinpthread_la-nanosleep.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwinpthread_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o src/libwinpthread_la-nanosleep.lo `test -f 'src/nanosleep.c' || echo '$(srcdir)/'`src/nanosleep.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -789,13 +834,15 @@ distcleancheck: distclean
 	       $(distcleancheck_listfiles) ; \
 	       exit 1; } >&2
 check-am: all-am
-check: check-am
+check: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) check-am
 all-am: Makefile $(LIBRARIES) $(LTLIBRARIES) $(HEADERS) config.h
 installdirs:
 	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
-install: install-am
+install: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) install-am
 install-exec: install-exec-am
 install-data: install-data-am
 uninstall: uninstall-am
@@ -822,10 +869,11 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
+	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-am
 
 clean-am: clean-generic clean-libLIBRARIES clean-libLTLIBRARIES \
-	clean-libtool mostlyclean-am
+	clean-libtool clean-noinstLTLIBRARIES mostlyclean-am
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
@@ -897,25 +945,26 @@ ps-am:
 uninstall-am: uninstall-includeHEADERS uninstall-libLIBRARIES \
 	uninstall-libLTLIBRARIES
 
-.MAKE: all install-am install-strip
+.MAKE: all check install install-am install-strip
 
 .PHONY: CTAGS GTAGS all all-am am--refresh check check-am clean \
 	clean-generic clean-libLIBRARIES clean-libLTLIBRARIES \
-	clean-libtool ctags dist dist-all dist-bzip2 dist-gzip \
-	dist-lzma dist-shar dist-tarZ dist-xz dist-zip distcheck \
-	distclean distclean-compile distclean-generic distclean-hdr \
-	distclean-libtool distclean-tags distcleancheck distdir \
-	distuninstallcheck dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-includeHEADERS install-info \
-	install-info-am install-libLIBRARIES install-libLTLIBRARIES \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags uninstall \
-	uninstall-am uninstall-includeHEADERS uninstall-libLIBRARIES \
+	clean-libtool clean-noinstLTLIBRARIES ctags dist dist-all \
+	dist-bzip2 dist-gzip dist-lzma dist-shar dist-tarZ dist-xz \
+	dist-zip distcheck distclean distclean-compile \
+	distclean-generic distclean-hdr distclean-libtool \
+	distclean-tags distcleancheck distdir distuninstallcheck dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-includeHEADERS install-info install-info-am \
+	install-libLIBRARIES install-libLTLIBRARIES install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags uninstall uninstall-am \
+	uninstall-includeHEADERS uninstall-libLIBRARIES \
 	uninstall-libLTLIBRARIES
 
 
@@ -923,6 +972,32 @@ uninstall-am: uninstall-includeHEADERS uninstall-libLIBRARIES \
 	$(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=CC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
+
+dll_dependency.o: src/dll_dependency.S
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+dll_math.o: src/dll_math.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+libgcc.a: dll_dependency.o dll_math.o
+	$(AR) cru $@ dll_dependency.o dll_math.o
+	touch $@	
+
+libgcc.dll.a: libgcc.a
+	cp $< $@
+	touch $@
+
+libgcc_s.a: libgcc.a
+	$(AR) cru $@
+	touch $@
+
+libgcc_s.dll.a: libgcc.a
+	$(AR) cru $@
+	touch $@
+
+# Force libgcc dummy build
+dummy.c: libgcc.a libgcc_s.a libgcc.dll.a libgcc_s.dll.a
+	echo "static int __attribute__((unused)) dummy;" > $@
 @COPY_SHARED_TRUE@libpthread.dll.a: libwinpthread.la
 @COPY_SHARED_TRUE@	cp -p $(LT_OBJDIR)/libwinpthread.dll.a $@
 @COPY_SHARED_TRUE@	touch $@

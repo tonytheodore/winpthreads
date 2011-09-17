@@ -5,15 +5,15 @@ lib_LTLIBRARIES = libwinpthread.la
 lib_LIBRARIES =
 
 libwinpthread_la_CPPFLAGS = -I$(srcdir)/include -DIN_WINPTHREAD
-libwinpthread_la_LDFLAGS = -no-undefined -version-info 1:0:0
+libwinpthread_la_LDFLAGS = -no-undefined -version-info 1:0:0 -L.
 # -export-symbols-regex '^(pthread|sem|sched)_' ?
 
 libwinpthread_la_SOURCES = \
   src/barrier.h  src/cond.h  src/misc.h  src/mutex.h  src/rwlock.h  src/spinlock.h  src/thread.h  src/ref.h  src/sem.h \
   src/barrier.c  src/cond.c  src/misc.c  src/mutex.c  src/rwlock.c  src/spinlock.c  src/thread.c  src/ref.c  src/sem.c  src/sched.c \
-  src/winpthread_internal.h  src/version.rc
+  src/winpthread_internal.h  src/clock.c src/nanosleep.c src/version.rc
 
-include_HEADERS = include/pthread.h include/sched.h include/semaphore.h include/pthread_unistd.h
+include_HEADERS = include/pthread.h include/sched.h include/semaphore.h include/pthread_unistd.h include/pthread_time.h
 
 DISTCHECK_CONFIGURE_FLAGS = --host=$(host_triplet)
 
@@ -23,6 +23,40 @@ DISTCHECK_CONFIGURE_FLAGS = --host=$(host_triplet)
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
+
+noinst_LTLIBRARIES = libdummy.la
+
+libwinpthread_la_LIBADD = libdummy.la
+
+dll_dependency.o: src/dll_dependency.S
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+dll_math.o: src/dll_math.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+libgcc.a: dll_dependency.o dll_math.o
+	$(AR) cru $@ dll_dependency.o dll_math.o
+	touch $@	
+
+libgcc.dll.a: libgcc.a
+	cp $< $@
+	touch $@
+
+libgcc_s.a: libgcc.a
+	$(AR) cru $@
+	touch $@
+
+libgcc_s.dll.a: libgcc.a
+	$(AR) cru $@
+	touch $@
+
+BUILT_SOURCES = dummy.c
+
+libdummy_la_SOURCES = dummy.c
+
+# Force libgcc dummy build
+dummy.c: libgcc.a libgcc_s.a libgcc.dll.a libgcc_s.dll.a
+	echo "static int __attribute__((unused)) dummy;" > $@
 
 if COPY_SHARED
 lib_LIBRARIES += libpthread.dll.a

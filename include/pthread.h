@@ -372,33 +372,16 @@ int WINPTHREAD_API pthread_condattr_init(pthread_condattr_t *a);
 int WINPTHREAD_API pthread_condattr_getpshared(const pthread_condattr_t *a, int *s);
 int WINPTHREAD_API pthread_condattr_setpshared(pthread_condattr_t *a, int s);
 
+#ifndef __clockid_t_defined
 typedef int clockid_t;
-/* System-wide realtime clock. Setting this clock requires appropriate
-   privileges. */
-#ifndef CLOCK_REALTIME
-#define CLOCK_REALTIME 0
-#endif
-/* Clock that cannot be set and represents monotonic time since some
-   unspecified starting point. */
-#ifndef CLOCK_MONOTONIC
-#define CLOCK_MONOTONIC 1
-#endif
-/* High-resolution per-process timer from the CPU. */
-#ifndef CLOCK_PROCESS_CPUTIME_ID
-#define CLOCK_PROCESS_CPUTIME_ID 2
-#endif
+#define __clockid_t_defined 1
+#endif  /* __clockid_t_defined */
 
 int WINPTHREAD_API pthread_condattr_getclock (const pthread_condattr_t *attr,
        clockid_t *clock_id);
 int WINPTHREAD_API pthread_condattr_setclock(pthread_condattr_t *attr,
        clockid_t clock_id);
 int WINPTHREAD_API __pthread_clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *rqtp, struct timespec *rmtp);
-#ifndef clock_nanosleep
-#define clock_nanosleep __pthread_clock_nanosleep
-#endif
-#ifndef TIMER_ABSTIME
-#define TIMER_ABSTIME 1
-#endif
 
 int WINPTHREAD_API pthread_barrierattr_init(void **attr);
 int WINPTHREAD_API pthread_barrierattr_destroy(void **attr);

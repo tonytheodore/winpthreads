@@ -26,6 +26,7 @@
  */
 #include <windows.h>
 #include <stdio.h>
+#include <time.h>
 #include "pthread.h"
 #include "ref.h"
 #include "cond.h"
@@ -33,6 +34,7 @@
 #include "spinlock.h"
 #include "thread.h"
 #include "misc.h"
+#include "winpthread_internal.h"
 
 int __pthread_shallcancel (void);
 
@@ -136,8 +138,6 @@ pthread_condattr_setclock(pthread_condattr_t *a, clockid_t clock_id)
     return EINVAL;
   return 0;
 }
-
-extern int pthread_delay_np_ms (DWORD to);
 
 int
 __pthread_clock_nanosleep (clockid_t clock_id, int flags, const struct timespec *rqtp,
