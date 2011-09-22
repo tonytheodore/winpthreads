@@ -408,42 +408,42 @@ int                        WINPTHREAD_API pthread_rwlockattr_setpshared(pthread_
 
 /* Recursive API emulation.  */
 #undef localtime_r
-#define localtime_r(_Time, _Tm) ({ struct tm *___tmp_tm;                \
-						pthread_testcancel();   \
-                                                tm = localtime((_Time));\
-                                                if (___tmp_tm) {        \
-                                                  *(_Tm) = *___tmp_tm;  \
-                                                  ___tmp_tm = (_Tm);    \
-                                                }                       \
-                                                ___tmp_tm;      })
+#define localtime_r(_Time, _Tm)	({ struct tm *___tmp_tm;		\
+						pthread_testcancel();	\
+						___tmp_tm = localtime((_Time));\
+						if (___tmp_tm) {	\
+						  *(_Tm) = *___tmp_tm;	\
+						  ___tmp_tm = (_Tm);	\
+						}			\
+						___tmp_tm;	})
 
 #undef gmtime_r
-#define gmtime_r(_Time,_Tm)     ({ struct tm *___tmp_tm;                \
-						pthread_testcancel();   \
-                                                tm = gmtime((_Time));   \
-                                                if (___tmp_tm) {        \
-                                                  *(_Tm) = *___tmp_tm;  \
-                                                  ___tmp_tm = (_Tm);    \
-                                                }                       \
-                                                ___tmp_tm;      })
+#define gmtime_r(_Time,_Tm)	({ struct tm *___tmp_tm;		\
+						pthread_testcancel();	\
+						___tmp_tm = gmtime((_Time)); \
+						if (___tmp_tm) {	\
+						  *(_Tm) = *___tmp_tm;	\
+						  ___tmp_tm = (_Tm);	\
+						}			\
+						___tmp_tm;	})
 
 #undef ctime_r
-#define ctime_r(_Time,_Str)     ({ char *___tmp_tm;    			   \
-						pthread_testcancel();   \
-                                                ___tmp_tm = ctime((_Time));\
-                                                if (___tmp_tm)          \
-                                                 ___tmp_tm =            \
-                                                   strcpy((_Str),___tmp_tm); \
-                                                ___tmp_tm;      })
+#define ctime_r(_Time,_Str)	({ char *___tmp_tm;			\
+						pthread_testcancel();	\
+						___tmp_tm = ctime((_Time));  \
+						if (___tmp_tm)		\
+						 ___tmp_tm =		\
+						   strcpy((_Str),___tmp_tm); \
+						___tmp_tm;	})
 
 #undef asctime_r
-#define asctime_r(_Tm, _Buf)    ({ char *___tmp_tm;   			\
-						pthread_testcancel();   \
-						___tmp_tm = asctime((_Tm));\
-                                                if (___tmp_tm)          \
-                                                 ___tmp_tm =            \
-                                                   strcpy((_Buf),___tmp_tm);\
-                                                ___tmp_tm;      })
+#define asctime_r(_Tm, _Buf)	({ char *___tmp_tm;			\
+						pthread_testcancel();	\
+						___tmp_tm = asctime((_Tm)); \
+						if (___tmp_tm)		\
+						 ___tmp_tm =		\
+						   strcpy((_Buf),___tmp_tm);\
+						___tmp_tm;	})
 
 #ifndef strtok_r
 #define strtok_r(__s, __sep, __last)  (*(__last) = strtok((__s), (__sep)))
