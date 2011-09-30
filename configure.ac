@@ -14,6 +14,7 @@ AM_MAINTAINER_MODE
 AC_CANONICAL_HOST
 
 # Checks for programs.
+AC_NO_EXECUTABLES
 AC_PROG_CC
 # Libtool 2.4 should check them correctly
 # AC_CHECK_TOOLS([AR],[ar],[:])
@@ -41,7 +42,8 @@ AC_TYPE_SIZE_T
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([ftime gettimeofday memset])
+# mingw-w64 should already have them
+#AC_CHECK_FUNCS([ftime gettimeofday memset])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
