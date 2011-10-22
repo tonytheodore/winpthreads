@@ -3,9 +3,15 @@ ACLOCAL_AMFLAGS = -I m4
 
 lib_LTLIBRARIES = libwinpthread.la
 lib_LIBRARIES =
+fakelibdir = fakelibs
+fakelib = $(fakelibdir)/libgcc.a $(fakelibdir)/libgcc_s.a $(fakelibdir)/libgcc.dll.a $(fakelibdir)/libgcc_s.dll.a \
+           $(fakelibdir)/libgcc_eh.a $(fakelibdir)/libpthread.a
+
+clean-local:
+	-rm -rf $(fakelibdir)
 
 libwinpthread_la_CPPFLAGS = -I$(srcdir)/include -DIN_WINPTHREAD
-libwinpthread_la_LDFLAGS = -no-undefined -version-info 1:0:0 -L.
+libwinpthread_la_LDFLAGS = -no-undefined -version-info 1:0:0 -L$(fakelibdir)
 # -export-symbols-regex '^(pthread|sem|sched)_' ?
 
 libwinpthread_la_SOURCES = \
@@ -34,19 +40,30 @@ dll_dependency.o: src/dll_dependency.S
 dll_math.o: src/dll_math.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-libgcc.a: dll_dependency.o dll_math.o
-	$(AR) cru $@ dll_dependency.o dll_math.o
-	touch $@	
+$(fakelibdir):
+	mkdir -p $@
 
-libgcc.dll.a: libgcc.a
-	cp $< $@
+$(fakelibdir)/libgcc.a: $(fakelibdir) dll_dependency.o dll_math.o
+	$(AR) cru $@ dll_dependency.o dll_math.o
 	touch $@
 
-libgcc_s.a: libgcc.a
+$(fakelibdir)/libgcc.dll.a: $(fakelibdir) $(fakelibdir)/libgcc.a
+	cp $(fakelibdir)/libgcc.a $@
+	touch $@
+
+$(fakelibdir)/libgcc_s.a: $(fakelibdir) $(fakelibdir)/libgcc.a
 	$(AR) cru $@
 	touch $@
 
-libgcc_s.dll.a: libgcc.a
+$(fakelibdir)/libgcc_s.dll.a: $(fakelibdir) $(fakelibdir)/libgcc.a
+	$(AR) cru $@
+	touch $@
+
+$(fakelibdir)/libgcc_eh.a:
+	$(AR) cru $@
+	touch $@
+
+$(fakelibdir)/libpthread.a:
 	$(AR) cru $@
 	touch $@
 
@@ -55,7 +72,7 @@ BUILT_SOURCES = dummy.c
 libdummy_la_SOURCES = dummy.c
 
 # Force libgcc dummy build
-dummy.c: libgcc.a libgcc_s.a libgcc.dll.a libgcc_s.dll.a
+dummy.c: $(fakelib)
 	echo "static int __attribute__((unused)) dummy;" > $@
 
 if COPY_SHARED
