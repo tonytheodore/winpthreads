@@ -73,6 +73,13 @@
 extern "C" {
 #endif
 
+#define __WINPTHREADS_VERSION_MAJOR 0
+#define __WINPTHREADS_VERSION_MINOR 5
+#define __WINPTHREADS_VERSION_PATCHLEVEL 0
+
+/* MSB 8-bit major version, 8-bit minor version, 16-bit patch level.  */
+#define __WINPTHREADS_VERSION 0x00050000
+
 #if defined DLL_EXPORT
 #ifdef IN_WINPTHREAD
 #define WINPTHREAD_API __declspec(dllexport)
