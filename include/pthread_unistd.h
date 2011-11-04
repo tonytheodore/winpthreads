@@ -20,8 +20,8 @@
    DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef PTHREAD_UNISTD_HXX
-#define  PTHREAD_UNISTD_HXX
+#ifndef WIN_PTHREADS_UNISTD_H
+#define WIN_PTHREADS_UNISTD_H
 
 /* Set defines described by the POSIX Threads Extension (1003.1c-1995) */
 /* _SC_THREADS
@@ -209,4 +209,4 @@
 #undef _POSIX_SEMAPHORES
 #define _POSIX_SEMAPHORES 200112
 
-#endif
+#endif /* WIN_PTHREADS_UNISTD_H */

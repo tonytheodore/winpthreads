@@ -22,8 +22,8 @@
 
 #include <pthread.h>
 
-#ifndef PTHREAD_TIME_HXX
-#define PTHREAD_TIME_HXX
+#ifndef WIN_PTHREADS_TIME_H
+#define WIN_PTHREADS_TIME_H
 
 /* Posix timers are supported */
 #ifndef _POSIX_TIMERS
@@ -86,5 +86,5 @@ int __cdecl WINPTHREAD_API clock_settime(clockid_t clock_id, const struct timesp
 }
 #endif
 
-#endif PTHREAD_TIME_HXX
+#endif /* WIN_PTHREADS_TIME_H */
 

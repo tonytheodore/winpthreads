@@ -30,8 +30,8 @@
 
 #include <sys/timeb.h>
 
-#ifndef WIN_SCHED_PTHREADS
-#define WIN_SCHED_PTHREADS
+#ifndef WIN_PTHREADS_SCHED_H
+#define WIN_PTHREADS_SCHED_H
 
 #ifndef SCHED_OTHER
 /* Some POSIX realtime extensions, mostly stubbed */
@@ -76,4 +76,4 @@ int WINPTHREAD_SCHED_API sched_setscheduler(pid_t pid, int pol);
   ( errno = ENOTSUP, (int) -1 )
 #endif
 
-#endif/*WIN_SCHED_PTHREADS*/
+#endif /* WIN_PTHREADS_SCHED_H */

@@ -20,8 +20,8 @@
    DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef WIN_SEMAPHORE
-#define WIN_SEMAPHORE
+#ifndef WIN_PTHREADS_SEMAPHORE_H
+#define WIN_PTHREADS_SEMAPHORE_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,7 +47,7 @@ extern "C" {
 typedef unsigned short mode_t;
 #endif
 
-typedef void	        *sem_t;
+typedef void		*sem_t;
 
 #define SEM_FAILED 		NULL
 
@@ -78,4 +78,4 @@ int WINPTHREAD_SEMA_API sem_getvalue(sem_t * sem, int * sval);
 }
 #endif
 
-#endif /* WIN_SEMAPHORE */
+#endif /* WIN_PTHREADS_SEMAPHORE_H */

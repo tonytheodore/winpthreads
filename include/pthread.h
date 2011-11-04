@@ -56,8 +56,8 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef WIN_PTHREADS
-#define WIN_PTHREADS
+#ifndef WIN_PTHREADS_H
+#define WIN_PTHREADS_H
 
 #include <stddef.h>
 #include <errno.h>
@@ -718,4 +718,4 @@ int                        WINPTHREAD_API pthread_rwlockattr_setpshared(pthread_
 }
 #endif
 
-#endif /* WIN_PTHREADS */
+#endif /* WIN_PTHREADS_H */
