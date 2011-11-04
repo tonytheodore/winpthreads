@@ -20,7 +20,7 @@
    DEALINGS IN THE SOFTWARE.
 */
 
-#include <pthread.h>
+#include <sys/timeb.h>
 
 #ifndef WIN_PTHREADS_TIME_H
 #define WIN_PTHREADS_TIME_H
@@ -74,6 +74,12 @@ typedef int clockid_t;
 extern "C" {
 #endif
 
+/* Make sure we provide default for WINTHREAD_API, if not defined.  */
+#pragma push_macro("WINTHREAD_API")
+#ifndef WINTHREAD_API
+#define WINTHREAD_API
+#endif
+
 /* These should really be dllimport'ed if using winpthread dll */
 int __cdecl WINPTHREAD_API nanosleep(const struct timespec *request, struct timespec *remain);
 
@@ -81,6 +87,8 @@ int __cdecl WINPTHREAD_API clock_nanosleep(clockid_t clock_id, int flags, const 
 int __cdecl WINPTHREAD_API clock_getres(clockid_t clock_id, struct timespec *res);
 int __cdecl WINPTHREAD_API clock_gettime(clockid_t clock_id, struct timespec *tp);
 int __cdecl WINPTHREAD_API clock_settime(clockid_t clock_id, const struct timespec *tp);
+
+#pragma pop_macro("WINPTHREAD_API")
 
 #ifdef __cplusplus
 }
