@@ -74,10 +74,10 @@ typedef int clockid_t;
 extern "C" {
 #endif
 
-/* Make sure we provide default for WINTHREAD_API, if not defined.  */
-#pragma push_macro("WINTHREAD_API")
-#ifndef WINTHREAD_API
-#define WINTHREAD_API
+/* Make sure we provide default for WINPTHREAD_API, if not defined.  */
+#pragma push_macro("WINPTHREAD_API")
+#ifndef WINPTHREAD_API
+#define WINPTHREAD_API
 #endif
 
 /* These should really be dllimport'ed if using winpthread dll */
