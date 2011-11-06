@@ -3,11 +3,11 @@
  * This file is part of the w64 mingw-runtime package.
  * No warranty is given; refer to the file DISCLAIMER.PD within this package.
  */
+
 #include <errno.h>
 #include <time.h>
 #include <windows.h>
 #include <pthread.h>
-#include "winpthread_internal.h"
 
 #define POW10_3                 1000
 #define POW10_4                 10000
