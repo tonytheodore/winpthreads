@@ -346,13 +346,12 @@ int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
 
     if (a)
       {
-        int share = PTHREAD_PROCESS_SHARED;
+        int share = PTHREAD_PROCESS_PRIVATE;
         r = pthread_mutexattr_gettype (a, &_m->type);
         if (!r)
           r = pthread_mutexattr_getpshared(a, &share);
         if (!r && share == PTHREAD_PROCESS_SHARED)
           {
-	    fprintf (stderr, "share %d != PTHREAD_PROCESS_SHARED\n", share);
 	    r = ENOSYS;
 	  }
       }
@@ -445,13 +444,13 @@ int pthread_mutexattr_getpshared(const pthread_mutexattr_t *a, int *type)
 int pthread_mutexattr_setpshared(pthread_mutexattr_t * a, int type)
 {
     int r = 0;
-    if (!a || (type != PTHREAD_PROCESS_SHARED && type != PTHREAD_PROCESS_PRIVATE))
+    if (!a || (type != PTHREAD_PROCESS_SHARED
+	&& type != PTHREAD_PROCESS_PRIVATE))
       return EINVAL;
     if (type == PTHREAD_PROCESS_SHARED)
     {
       type = PTHREAD_PROCESS_PRIVATE;
       r = ENOSYS;
-      fprintf (stderr, "Set private $$$$\n");
     }
     type = (type == PTHREAD_PROCESS_SHARED ? 4 : 0);
 
