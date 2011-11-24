@@ -249,6 +249,7 @@ int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *ts)
 {
     unsigned long long t, ct;
     int r;
+    mutex_t *_m;
 
     if (!ts) return pthread_mutex_lock(m);
     r = mutex_ref(m);
@@ -258,7 +259,7 @@ int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *ts)
     r=_mutex_trylock(m);
     if (r != EBUSY) return mutex_unref(m,r);
     
-    mutex_t *_m = (mutex_t *)*m;
+    _m = (mutex_t *)*m;
     if (_m->type != PTHREAD_MUTEX_NORMAL && COND_LOCKED(_m) && COND_OWNER(_m))
       return mutex_unref(m,EDEADLK);
     ct = _pthread_time_in_ms();
@@ -269,11 +270,12 @@ int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *ts)
 }
 
 int pthread_mutex_unlock(pthread_mutex_t *m)
-{
+{    
+    mutex_t *_m;
     int r = mutex_ref_unlock(m);
     if(r) return r;
 
-    mutex_t *_m = (mutex_t *)*m;
+    _m = (mutex_t *)*m;
     if (_m->type == PTHREAD_MUTEX_NORMAL)
     {
         if (!COND_LOCKED(_m))
@@ -383,13 +385,14 @@ int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
 
 int pthread_mutex_destroy(pthread_mutex_t *m)
 {
+    mutex_t *_m;
     pthread_mutex_t mDestroy;
     int r = mutex_ref_destroy(m,&mDestroy);
     if(r) return r;
     if(!mDestroy) return 0; /* destroyed a (still) static initialized mutex */
 
     /* now the mutex is invalid, and no one can touch it */
-    mutex_t *_m = (mutex_t *)mDestroy;
+    _m = (mutex_t *)mDestroy;
 
 
     CloseHandle(_m->h);

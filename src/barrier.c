@@ -90,12 +90,13 @@ barrier_ref_set (volatile pthread_barrier_t *barrier, void *v)
 int pthread_barrier_destroy(pthread_barrier_t *b_)
 {
     pthread_barrier_t bDestroy;
+    barrier_t *b;
     int r = barrier_ref_destroy(b_,&bDestroy);
     
     if (r)
       return r;
 
-    barrier_t *b = (barrier_t *)bDestroy;
+    b = (barrier_t *)bDestroy;
     
     pthread_mutex_lock(&b->m);
 
@@ -174,11 +175,12 @@ int pthread_barrier_wait(pthread_barrier_t *b_)
 {
   long sel;
   int r, e, rslt;
+  barrier_t *b;
 
   r = barrier_ref(b_);
   if(r) return r;
 
-  barrier_t *b = (barrier_t *)*b_;
+  b = (barrier_t *)*b_;
 
   if ((r = pthread_mutex_lock(&b->m))) return  barrier_unref(b_,EINVAL);
   sel = b->sel;

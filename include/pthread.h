@@ -69,6 +69,8 @@
 
 #include <sys/timeb.h>
 
+#include "pthread_compat.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -301,7 +303,7 @@ void      WINPTHREAD_API _pthread_cleanup_dest(pthread_t t);
 pthread_t WINPTHREAD_API pthread_self(void);
 int       WINPTHREAD_API pthread_get_concurrency(int *val);
 int       WINPTHREAD_API pthread_set_concurrency(int val);
-int       WINPTHREAD_API pthread_exit(void *res);
+void      WINPTHREAD_API pthread_exit(void *res);
 void      WINPTHREAD_API _pthread_invoke_cancel(void);
 void      WINPTHREAD_API pthread_testcancel(void);
 int       WINPTHREAD_API pthread_cancel(pthread_t t);

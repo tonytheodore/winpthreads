@@ -322,6 +322,8 @@ static BOOL WINAPI
 __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 {
   _pthread_v *t = NULL;
+  spin_t new_spin_keys = {0, LIFE_SPINLOCK, 1};
+
   if (dwReason == DLL_PROCESS_DETACH)
     {
       free_pthread_mem ();
@@ -342,7 +344,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	      t->h = NULL;
 	    }
 	  pthread_mutex_destroy (&t->p_clock);
-	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK, 1};
+	  t->spin_keys = new_spin_keys;
 	  push_pthread_mem (t);
 	  t = NULL;
 	  TlsSetValue (_pthread_tls, t);
@@ -365,7 +367,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	      TlsSetValue (_pthread_tls, t);
 	    }
 	  pthread_mutex_destroy(&t->p_clock);
-	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK, 1};
+	  t->spin_keys = new_spin_keys;
 	}
       else if (t)
 	{
@@ -373,14 +375,20 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 	    CloseHandle (t->evStart);
 	  t->evStart = NULL;
 	  pthread_mutex_destroy (&t->p_clock);
-	  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
+	  t->spin_keys = new_spin_keys;
 	}
     }
   return TRUE;
 }
 
 /* TLS-runtime section variable.  */
-PIMAGE_TLS_CALLBACK __xl_f __attribute__ ((section (".CRT$XLF"))) = (PIMAGE_TLS_CALLBACK) __dyn_tls_pthread;
+#ifdef _MSC_VER
+#pragma section(".CRT$XLF", shared)
+#endif
+PIMAGE_TLS_CALLBACK __attribute__ ((__section__ (".CRT$XLF"))) __xl_f  = (PIMAGE_TLS_CALLBACK) __dyn_tls_pthread;
+#ifdef _MSC_VER
+#pragma data_seg()
+#endif
 
 #ifdef WINPTHREAD_DBG
 static int print_state = 0;
@@ -858,6 +866,7 @@ static _pthread_v *
 __pthread_self_lite (void)
 {
   _pthread_v *t;
+  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
 
   _pthread_once_raw (&_pthread_tls_once, pthread_tls_init);
 
@@ -875,7 +884,7 @@ __pthread_self_lite (void)
   t->tid = GetCurrentThreadId();
   t->evStart = CreateEvent (NULL, 1, 0, NULL);
   t->p_clock = PTHREAD_MUTEX_INITIALIZER;
-  t->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
+  t->spin_keys = new_spin_keys;
   t->sched_pol = SCHED_OTHER;
   t->h = NULL; //GetCurrentThread();
   if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &t->h, 0, FALSE, DUPLICATE_SAME_ACCESS))
@@ -939,15 +948,12 @@ pthread_set_concurrency (int val)
   return 0;
 }
 
-int
+void
 pthread_exit (void *res)
 {
   _pthread_v *t = NULL;
   unsigned rslt = (unsigned) ((intptr_t) res);
   struct _pthread_v *id = __pthread_self_lite ();
-
-  if (!id)
-    return EINVAL;
 
   id->ret_arg = res;
 
@@ -994,9 +1000,9 @@ pthread_exit (void *res)
 void
 _pthread_invoke_cancel (void)
 {
+  _pthread_cleanup *pcup;
   struct _pthread_v *se = __pthread_self_lite ();
   se->in_cancel = 1;
-  _pthread_cleanup *pcup;
   _pthread_setnobreak (1);
   InterlockedDecrement(&_pthread_cancelling);
 
@@ -1410,6 +1416,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
   int redo = 0;
   struct _pthread_v *tv;
   size_t ssize = 0;
+  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
 
   if ((tv = pop_pthread_mem ()) == NULL)
     return EAGAIN;
@@ -1434,7 +1441,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
   while (++redo <= 4);
 
   tv->p_clock = PTHREAD_MUTEX_INITIALIZER;
-  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
+  tv->spin_keys = new_spin_keys;
   tv->valid = LIFE_THREAD;
   tv->sched.sched_priority = THREAD_PRIORITY_NORMAL;
   tv->sched_pol = SCHED_OTHER;
@@ -1472,7 +1479,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
       if (tv->evStart)
 	CloseHandle (tv->evStart);
       pthread_mutex_destroy (&tv->p_clock);
-      tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
+      tv->spin_keys = new_spin_keys;
       tv->evStart = NULL;
       if (th)
         memset(th,0, sizeof (pthread_t));
@@ -1513,6 +1520,7 @@ pthread_join (pthread_t t, void **res)
 {
   DWORD dwFlags;
   struct _pthread_v *tv = __pth_gpointer_locked (t);
+  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
 
   if (!tv || tv->h == NULL || !GetHandleInformation(tv->h, &dwFlags))
     return ESRCH;
@@ -1533,7 +1541,7 @@ pthread_join (pthread_t t, void **res)
   if (res)
     *res = tv->ret_arg;
   pthread_mutex_destroy (&tv->p_clock);
-  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
+  tv->spin_keys = new_spin_keys;
   push_pthread_mem (tv);
 
   return 0;
@@ -1544,6 +1552,7 @@ _pthread_tryjoin (pthread_t t, void **res)
 {
   DWORD dwFlags;
   struct _pthread_v *tv;
+  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
 
   pthread_mutex_lock (&mtx_pthr_locked);
   tv = __pth_gpointer_locked (t);
@@ -1582,7 +1591,7 @@ _pthread_tryjoin (pthread_t t, void **res)
   if (res)
     *res = tv->ret_arg;
   pthread_mutex_destroy (&tv->p_clock);
-  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
+  tv->spin_keys = new_spin_keys;
 
   push_pthread_mem (tv);
 
@@ -1598,6 +1607,7 @@ pthread_detach (pthread_t t)
   DWORD dwFlags;
   struct _pthread_v *tv = __pth_gpointer_locked (t);
   HANDLE dw;
+  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
 
   pthread_mutex_lock (&mtx_pthr_locked);
   if (!tv || tv->h == NULL || !GetHandleInformation(tv->h, &dwFlags))
@@ -1624,7 +1634,7 @@ pthread_detach (pthread_t t)
 	    CloseHandle (tv->evStart);
 	  tv->evStart = NULL;
 	  pthread_mutex_destroy (&tv->p_clock);
-	  tv->spin_keys = (spin_t) {0,LIFE_SPINLOCK,1};
+	  tv->spin_keys = new_spin_keys;
 	  push_pthread_mem (tv);
 	}
     }

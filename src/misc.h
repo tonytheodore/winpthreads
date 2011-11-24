@@ -23,6 +23,8 @@
 #ifndef WIN_PTHREADS_MISC_H
 #define WIN_PTHREADS_MISC_H
 
+#include "pthread_compat.h"
+
 #ifndef assert
 
 #ifndef ASSERT_TRACE

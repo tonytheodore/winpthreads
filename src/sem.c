@@ -214,7 +214,7 @@ sem_timedwait (sem_t *sem, const struct timespec *t)
   int cur_v, ret = 0;
   DWORD dwr;
   HANDLE semh;
-  _sem_t *sv;;
+  _sem_t *sv;
   struct sSemTimedWait arg;
 
   if (!t)
@@ -327,7 +327,7 @@ sem_unlink (const char *name)
 int
 sem_getvalue (sem_t *sem, int *sval)
 {
-  _sem_t *sv;;
+  _sem_t *sv;
   int r;
 
   if (!sval)
