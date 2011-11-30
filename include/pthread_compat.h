@@ -70,7 +70,11 @@
 
 #include "pthread_time.h"
 
+#ifdef _WIN64
 typedef __int64 pid_t;
+#else
+typedef int     pid_t;
+#endif
 typedef int clockid_t;
 
 #define WINPTHREADS_INLINE __inline
