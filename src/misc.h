@@ -82,7 +82,7 @@ typedef long LONGBAG;
 #define VALID(x)    if (!(p)) return EINVAL;
 
 /* ms can be 64 bit, solve wrap-around issues: */
-static inline unsigned long dwMilliSecs(unsigned long long ms)
+static WINPTHREADS_INLINE unsigned long dwMilliSecs(unsigned long long ms)
 {
   if (ms >= 0xffffffffULL) return 0xfffffffful;
   return (unsigned long) ms;

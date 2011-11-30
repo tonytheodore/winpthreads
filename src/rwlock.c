@@ -31,9 +31,9 @@
 
 static spin_t rwl_global = {0,LIFE_SPINLOCK,1};
 
-static __attribute__((noinline)) int rwlock_static_init(pthread_rwlock_t *rw);
+static WINPTHREADS_ATTRIBUTE((noinline)) int rwlock_static_init(pthread_rwlock_t *rw);
 
-static __attribute__ ((noinline)) int rwl_unref(volatile pthread_rwlock_t *rwl, int res)
+static WINPTHREADS_ATTRIBUTE((noinline)) int rwl_unref(volatile pthread_rwlock_t *rwl, int res)
 {
     _spin_lite_lock(&rwl_global);
 #ifdef WINPTHREAD_DBG
@@ -44,7 +44,7 @@ static __attribute__ ((noinline)) int rwl_unref(volatile pthread_rwlock_t *rwl, 
     return res;
 }
 
-static __attribute__((noinline)) int rwl_ref(pthread_rwlock_t *rwl, int f )
+static WINPTHREADS_ATTRIBUTE((noinline)) int rwl_ref(pthread_rwlock_t *rwl, int f )
 {
     int r = 0;
     INIT_RWLOCK(rwl);
@@ -60,7 +60,7 @@ static __attribute__((noinline)) int rwl_ref(pthread_rwlock_t *rwl, int f )
     return r;
 }
 
-static __attribute__((noinline)) int rwl_ref_unlock(pthread_rwlock_t *rwl )
+static WINPTHREADS_ATTRIBUTE((noinline)) int rwl_ref_unlock(pthread_rwlock_t *rwl )
 {
     int r = 0;
 
@@ -77,7 +77,7 @@ static __attribute__((noinline)) int rwl_ref_unlock(pthread_rwlock_t *rwl )
     return r;
 }
 
-static __attribute__((noinline)) int rwl_ref_destroy(pthread_rwlock_t *rwl, pthread_rwlock_t *rDestroy )
+static WINPTHREADS_ATTRIBUTE((noinline)) int rwl_ref_destroy(pthread_rwlock_t *rwl, pthread_rwlock_t *rDestroy )
 {
     int r = 0;
 
@@ -150,7 +150,7 @@ void rwl_print(volatile pthread_rwlock_t *rwl, char *txt)
 
 static spin_t cond_locked = {0,LIFE_SPINLOCK,1};
 
-static __attribute__((noinline)) int rwlock_static_init(pthread_rwlock_t *rw)
+static WINPTHREADS_ATTRIBUTE((noinline)) int rwlock_static_init(pthread_rwlock_t *rw)
 {
   int r;
   _spin_lite_lock(&cond_locked);

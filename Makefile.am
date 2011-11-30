@@ -19,7 +19,7 @@ libwinpthread_la_SOURCES = \
   src/barrier.c  src/cond.c  src/misc.c  src/mutex.c  src/rwlock.c  src/spinlock.c  src/thread.c  src/ref.c  src/sem.c  src/sched.c \
   src/winpthread_internal.h  src/clock.c src/nanosleep.c src/version.rc
 
-include_HEADERS = include/pthread.h include/sched.h include/semaphore.h include/pthread_unistd.h include/pthread_time.h
+include_HEADERS = include/pthread.h include/sched.h include/semaphore.h include/pthread_unistd.h include/pthread_time.h include/pthread_compat.h
 
 DISTCHECK_CONFIGURE_FLAGS = --host=$(host_triplet)
 

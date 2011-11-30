@@ -19,7 +19,7 @@
  */
 #define DELTA_EPOCH_IN_100NS    INT64_C(116444736000000000)
 
-static __inline int lc_set_errno(int result)
+static WINPTHREADS_INLINE int lc_set_errno(int result)
 {
     if (result != 0) {
         errno = result;

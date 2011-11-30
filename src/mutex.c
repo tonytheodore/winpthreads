@@ -30,13 +30,13 @@
 #include "misc.h"
 
 extern int do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout);
-static __attribute__((noinline)) int mutex_static_init(pthread_mutex_t *m);
-static __attribute__((noinline)) int _mutex_trylock(pthread_mutex_t *m);
+static WINPTHREADS_ATTRIBUTE((noinline)) int mutex_static_init(pthread_mutex_t *m);
+static WINPTHREADS_ATTRIBUTE((noinline)) int _mutex_trylock(pthread_mutex_t *m);
 
 static spin_t mutex_global = {0,LIFE_SPINLOCK,1};
 static spin_t mutex_global_static = {0,LIFE_SPINLOCK,1};
 
-static __attribute__((noinline)) int
+static WINPTHREADS_ATTRIBUTE((noinline)) int
 mutex_unref(pthread_mutex_t *m, int r)
 {
     mutex_t *m_ = (mutex_t *)*m;
@@ -51,7 +51,7 @@ mutex_unref(pthread_mutex_t *m, int r)
 
 /* Set the mutex to busy in a thread-safe way */
 /* A busy mutex can't be destroyed */
-static __attribute__((noinline)) int
+static WINPTHREADS_ATTRIBUTE((noinline)) int
 mutex_ref(pthread_mutex_t *m)
 {
     int r = 0;
@@ -85,7 +85,7 @@ mutex_ref(pthread_mutex_t *m)
 }
 
 /* An unlock can simply fail with EPERM instead of auto-init (can't be owned) */
-static __attribute__((noinline)) int
+static WINPTHREADS_ATTRIBUTE((noinline)) int
 mutex_ref_unlock(pthread_mutex_t *m)
 {
     int r = 0;
@@ -108,7 +108,7 @@ mutex_ref_unlock(pthread_mutex_t *m)
 
 /* doesn't lock the mutex but set it to invalid in a thread-safe way */
 /* A busy mutex can't be destroyed -> EBUSY */
-static __attribute__((noinline)) int
+static WINPTHREADS_ATTRIBUTE((noinline)) int
 mutex_ref_destroy(pthread_mutex_t *m, pthread_mutex_t *mDestroy )
 {
     int r = 0;
@@ -135,7 +135,7 @@ mutex_ref_destroy(pthread_mutex_t *m, pthread_mutex_t *mDestroy )
     return r;
 }
 
-static __attribute__((noinline)) int mutex_ref_init(pthread_mutex_t *m )
+static WINPTHREADS_ATTRIBUTE((noinline)) int mutex_ref_init(pthread_mutex_t *m )
 {
     int r = 0;
 
@@ -173,7 +173,7 @@ void mutex_print(pthread_mutex_t *m, char *txt)
 }
 #endif
 
-static __attribute__((noinline)) int
+static WINPTHREADS_ATTRIBUTE((noinline)) int
 mutex_static_init(pthread_mutex_t *m)
 {
     static pthread_mutexattr_t mxattr_recursive = PTHREAD_MUTEX_RECURSIVE;
@@ -297,7 +297,7 @@ int pthread_mutex_unlock(pthread_mutex_t *m)
     return mutex_unref(m,0);
 }
 
-static __attribute__((noinline)) int
+static WINPTHREADS_ATTRIBUTE((noinline)) int
 _mutex_trylock(pthread_mutex_t *m)
 {
     int r = 0;

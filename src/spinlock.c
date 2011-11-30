@@ -63,7 +63,7 @@ inc_test (long volatile *p)
   return 0;
 }
 
-static inline int
+static WINPTHREADS_INLINE int
 spinlock_static_init (pthread_spinlock_t *l)
 {
   int ret;

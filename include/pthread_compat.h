@@ -60,16 +60,22 @@
 #ifndef WIN_PTHREADS_PTHREAD_COMPAT_H
 #define WIN_PTHREADS_PTHREAD_COMPAT_H
 
-#ifdef _MSC_VER
+#ifdef __GNUC__
+
+#define WINPTHREADS_INLINE inline
+#define WINPTHREADS_ATTRIBUTE(X) __attribute__(X)
+#define WINPTHREADS_SECTION(X) __section__(X)
+
+#elif _MSC_VER
 
 #include "pthread_time.h"
 
 typedef __int64 pid_t;
 typedef int clockid_t;
 
-#define inline __inline
-#define __attribute__(X) __declspec X
-#define __section__(X) allocate(X)
+#define WINPTHREADS_INLINE __inline
+#define WINPTHREADS_ATTRIBUTE(X) __declspec X
+#define WINPTHREADS_SECTION(X) allocate(X)
 
 #endif
 

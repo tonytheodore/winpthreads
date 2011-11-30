@@ -385,7 +385,7 @@ __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 #ifdef _MSC_VER
 #pragma section(".CRT$XLF", shared)
 #endif
-PIMAGE_TLS_CALLBACK __attribute__ ((__section__ (".CRT$XLF"))) __xl_f  = (PIMAGE_TLS_CALLBACK) __dyn_tls_pthread;
+PIMAGE_TLS_CALLBACK WINPTHREADS_ATTRIBUTE((WINPTHREADS_SECTION(".CRT$XLF"))) __xl_f  = (PIMAGE_TLS_CALLBACK) __dyn_tls_pthread;
 #ifdef _MSC_VER
 #pragma data_seg()
 #endif

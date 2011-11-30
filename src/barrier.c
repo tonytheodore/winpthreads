@@ -30,7 +30,7 @@
 
 static spin_t barrier_global = {0,LIFE_SPINLOCK,1};
 
-static __attribute__((noinline)) int
+static WINPTHREADS_ATTRIBUTE((noinline)) int
 barrier_unref(volatile pthread_barrier_t *barrier, int res)
 {
     _spin_lite_lock(&barrier_global);
@@ -42,7 +42,7 @@ barrier_unref(volatile pthread_barrier_t *barrier, int res)
     return res;
 }
 
-static __attribute__((noinline)) int barrier_ref(volatile pthread_barrier_t *barrier)
+static WINPTHREADS_ATTRIBUTE((noinline)) int barrier_ref(volatile pthread_barrier_t *barrier)
 {
     int r = 0;
     _spin_lite_lock(&barrier_global);
@@ -57,7 +57,7 @@ static __attribute__((noinline)) int barrier_ref(volatile pthread_barrier_t *bar
     return r;
 }
 
-static __attribute__((noinline))  int
+static WINPTHREADS_ATTRIBUTE((noinline))  int
 barrier_ref_destroy(volatile pthread_barrier_t *barrier, pthread_barrier_t *bDestroy)
 {
     int r = 0;
@@ -79,7 +79,7 @@ barrier_ref_destroy(volatile pthread_barrier_t *barrier, pthread_barrier_t *bDes
     return r;
 }
 
-static __attribute__((noinline)) void
+static WINPTHREADS_ATTRIBUTE((noinline)) void
 barrier_ref_set (volatile pthread_barrier_t *barrier, void *v)
 {
   _spin_lite_lock(&barrier_global);
