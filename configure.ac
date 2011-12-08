@@ -40,10 +40,12 @@ AC_C_INLINE
 AC_TYPE_SIZE_T
 
 # Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
+#AC_FUNC_MALLOC
+#AC_FUNC_REALLOC
 # mingw-w64 should already have them
 #AC_CHECK_FUNCS([ftime gettimeofday memset])
+
+AC_SUBST([RCFLAGS])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
