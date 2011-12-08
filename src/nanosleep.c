@@ -8,6 +8,7 @@
 #include <time.h>
 #include <windows.h>
 #include <pthread.h>
+#include "winpthread_internal.h"
 
 #define POW10_3                 1000
 #define POW10_4                 10000
