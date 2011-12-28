@@ -10,6 +10,7 @@
 #include <windows.h>
 
 #include "pthread.h"
+#include "pthread_time.h"
 
 #define POW10_7                 10000000
 #define POW10_9                 1000000000
