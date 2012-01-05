@@ -23,6 +23,7 @@
 #include <windows.h>
 #include <winternl.h>
 #include <stdio.h>
+#include <malloc.h>
 #include "pthread.h"
 #include "spinlock.h"
 #include "ref.h"

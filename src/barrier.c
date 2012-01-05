@@ -22,6 +22,7 @@
 
 #include <windows.h>
 #include <stdio.h>
+#include <malloc.h>
 #include "pthread.h"
 #include "barrier.h"
 #include "ref.h" 

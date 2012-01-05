@@ -26,6 +26,7 @@
  */
 #include <windows.h>
 #include <stdio.h>
+#include <malloc.h>
 #include <time.h>
 #include "pthread.h"
 #include "pthread_time.h"

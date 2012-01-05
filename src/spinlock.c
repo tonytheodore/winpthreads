@@ -22,10 +22,11 @@
 
 #include <windows.h>
 #include <stdio.h>
+#include <malloc.h>
 #include "pthread.h"
 #include "spinlock.h"
 #include "misc.h"
-      
+
 static spin_t spin_locked = {0,LIFE_SPINLOCK, 1};
 
 static int

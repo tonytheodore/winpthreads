@@ -22,6 +22,7 @@
 
 #include <windows.h>
 #include <stdio.h>
+#include <malloc.h>
 #include "pthread.h"
 #include "thread.h"
 #include "misc.h"
