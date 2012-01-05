@@ -7,7 +7,8 @@
 #include <errno.h>
 #include <time.h>
 #include <windows.h>
-#include <pthread.h>
+#include "pthread.h"
+#include "pthread_time.h"
 #include "winpthread_internal.h"
 
 #define POW10_3                 1000

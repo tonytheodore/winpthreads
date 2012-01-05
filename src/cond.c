@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "pthread.h"
+#include "pthread_time.h"
 #include "ref.h"
 #include "cond.h"
 #include "mutex.h"
