@@ -99,13 +99,13 @@ extern "C" {
 
 /* Error-codes.  */
 #ifndef ETIMEDOUT
-#define ETIMEDOUT	10060
+#define ETIMEDOUT	138
 #endif
 #ifndef ENOTSUP
-#define ENOTSUP		134
+#define ENOTSUP		129
 #endif
 #ifndef EWOULDBLOCK
-#define EWOULDBLOCK	10035
+#define EWOULDBLOCK	140
 #endif
 
 /* pthread specific defines.  */
