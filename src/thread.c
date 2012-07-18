@@ -747,17 +747,20 @@ pthread_key_delete (pthread_key_t key)
 void *
 pthread_getspecific (pthread_key_t key)
 {
+  DWORD lasterr = GetLastError ();
   void *r;
   _pthread_v *t = __pthread_self_lite ();
   _spin_lite_lock (&t->spin_keys);
   r = (key >= t->keymax || t->keyval_set[key] == 0 ? NULL : t->keyval[key]);
   _spin_lite_unlock (&t->spin_keys);
+  SetLastError (lasterr);
   return r;
 }
 
 int
 pthread_setspecific (pthread_key_t key, const void *value)
 {
+  DWORD lasterr = GetLastError ();
   _pthread_v *t = __pthread_self_lite ();
   
   _spin_lite_lock (&t->spin_keys);
@@ -794,6 +797,7 @@ pthread_setspecific (pthread_key_t key, const void *value)
   t->keyval[key] = (void *) value;
   t->keyval_set[key] = 1;
   _spin_lite_unlock (&t->spin_keys);
+  SetLastError (lasterr);
 
   return 0;
 }

@@ -8,7 +8,9 @@
 #include <stdint.h>
 #include <time.h>
 #include <windows.h>
-
+#ifndef IN_WINPTHREAD
+#define IN_WINPTHREAD 1
+#endif
 #include "pthread.h"
 #include "pthread_time.h"
 
