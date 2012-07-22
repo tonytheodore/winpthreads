@@ -115,7 +115,7 @@ mutex_ref_destroy(pthread_mutex_t *m, pthread_mutex_t *mDestroy )
     int r = 0;
 
     *mDestroy = NULL;
-    /* also considered as busy, any concurrent access prevents destruction: */
+    /* also considered as busy, any concurrent access prevents destruction: $$$$ */
     if (_spin_lite_trylock(&mutex_global))
       return EBUSY;
     
@@ -217,10 +217,13 @@ pthread_mutex_lock_intern (pthread_mutex_t *m, DWORD timeout)
 {
     mutex_t *_m;
     int r;
-    r = mutex_ref(m);
-    if(r) return r;
+    HANDLE h;
 
-    _m = (mutex_t *)*m;
+    r = mutex_ref (m);
+    if (r)
+      return r;
+
+    _m = (mutex_t *) *m;
     if (_m->type != PTHREAD_MUTEX_NORMAL)
     {
       if (COND_LOCKED(_m))
@@ -236,14 +239,21 @@ pthread_mutex_lock_intern (pthread_mutex_t *m, DWORD timeout)
 	}
       }
     }
-    r = do_sema_b_wait_intern (_m->h, 1, timeout);
-    if (r == 0)
-    {
-      _m->count = 1;
-      SET_OWNER(_m);
-    }
-    return mutex_unref(m,r);
+    h = _m->h;
+    mutex_unref (m, 0);
 
+    r = do_sema_b_wait_intern (h, 1, timeout);
+
+    if (r != 0)
+      return r;
+
+    r = mutex_ref (m);
+    if (r)
+      return r;
+
+    _m->count = 1;
+    SET_OWNER(_m);
+    return mutex_unref (m, r);
 }
 
 int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *ts)
@@ -257,7 +267,7 @@ int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *ts)
     if (r) return r;
 
     /* Try to lock it without waiting */
-    r=_mutex_trylock(m);
+    r = _mutex_trylock (m);
     if (r != EBUSY) return mutex_unref(m,r);
     
     _m = (mutex_t *)*m;
