@@ -176,10 +176,10 @@ pthread_spin_trylock (pthread_spinlock_t *l)
   if (_l->l < 1)
     return EBUSY;
 
-  if (!dec_test (&_l->l))
+  while (!dec_test (&_l->l))
     {
       inc_volatile (&_l->l);
-      return EBUSY;
+      Sleep (0);
     }
 
   if (_l->owner == _l->cur)
@@ -200,10 +200,11 @@ _spin_lite_trylock (spin_t *l)
 
   if (l->l < 1)
     return EBUSY;
-  if (!dec_test (&l->l))
+
+  while (!dec_test (&l->l))
     {
       inc_volatile (&l->l);
-      return EBUSY;
+      Sleep (0);
     }
 
   if (l->owner == l->cur)
