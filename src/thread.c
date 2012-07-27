@@ -323,7 +323,7 @@ static BOOL WINAPI
 __dyn_tls_pthread (HANDLE hDllHandle, DWORD dwReason, LPVOID lpreserved)
 {
   _pthread_v *t = NULL;
-  spin_t new_spin_keys = {0, LIFE_SPINLOCK, 1};
+  spin_t new_spin_keys = {0, 0, LIFE_SPINLOCK, 1};
 
   if (dwReason == DLL_PROCESS_DETACH)
     {
@@ -428,7 +428,7 @@ typedef struct collect_once_t {
 
 static collect_once_t *once_obj = NULL;
 
-static spin_t once_global = {0,LIFE_SPINLOCK,1};
+static spin_t once_global = {0, 0, LIFE_SPINLOCK,1};
 
 static collect_once_t *
 enterOnceObject (pthread_once_t *o)
@@ -871,7 +871,7 @@ static _pthread_v *
 __pthread_self_lite (void)
 {
   _pthread_v *t;
-  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
+  spin_t new_spin_keys = {0, 0, LIFE_SPINLOCK,1};
 
   _pthread_once_raw (&_pthread_tls_once, pthread_tls_init);
 
@@ -1421,7 +1421,7 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
   int redo = 0;
   struct _pthread_v *tv;
   size_t ssize = 0;
-  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
+  spin_t new_spin_keys = {0, 0, LIFE_SPINLOCK,1};
 
   if ((tv = pop_pthread_mem ()) == NULL)
     return EAGAIN;
@@ -1525,7 +1525,7 @@ pthread_join (pthread_t t, void **res)
 {
   DWORD dwFlags;
   struct _pthread_v *tv = __pth_gpointer_locked (t);
-  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
+  spin_t new_spin_keys = {0, 0, LIFE_SPINLOCK,1};
 
   if (!tv || tv->h == NULL || !GetHandleInformation(tv->h, &dwFlags))
     return ESRCH;
@@ -1557,7 +1557,7 @@ _pthread_tryjoin (pthread_t t, void **res)
 {
   DWORD dwFlags;
   struct _pthread_v *tv;
-  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
+  spin_t new_spin_keys = {0, 0, LIFE_SPINLOCK,1};
 
   pthread_mutex_lock (&mtx_pthr_locked);
   tv = __pth_gpointer_locked (t);
@@ -1612,7 +1612,7 @@ pthread_detach (pthread_t t)
   DWORD dwFlags;
   struct _pthread_v *tv = __pth_gpointer_locked (t);
   HANDLE dw;
-  spin_t new_spin_keys = {0,LIFE_SPINLOCK,1};
+  spin_t new_spin_keys = {0, 0, LIFE_SPINLOCK,1};
 
   pthread_mutex_lock (&mtx_pthr_locked);
   if (!tv || tv->h == NULL || !GetHandleInformation(tv->h, &dwFlags))

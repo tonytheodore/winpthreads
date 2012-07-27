@@ -84,7 +84,7 @@ void cond_print(volatile pthread_cond_t *c, char *txt)
 }
 #endif
 
-static spin_t cond_locked = {0,LIFE_SPINLOCK,1};
+static spin_t cond_locked = {0, 0, LIFE_SPINLOCK,1};
 
 static int cond_static_init(pthread_cond_t *c)
 {

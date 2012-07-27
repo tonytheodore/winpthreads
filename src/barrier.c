@@ -29,7 +29,7 @@
 #include "misc.h"
 #include "spinlock.h"
 
-static spin_t barrier_global = {0,LIFE_SPINLOCK,1};
+static spin_t barrier_global = {0, 0, LIFE_SPINLOCK,1};
 
 static WINPTHREADS_ATTRIBUTE((noinline)) int
 barrier_unref(volatile pthread_barrier_t *barrier, int res)

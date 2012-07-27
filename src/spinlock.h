@@ -33,17 +33,16 @@
 #define SET_OWNER_SLIF(l,r)	
 #define UNSET_OWNER_SL(l)
 
-#define CHECK_SPINLOCK_LITE(l) if (!(l)) return EINVAL;
-
 #define INIT_SPINLOCK(s)  { int r; \
     if (PTHREAD_SPINLOCK_INITIALIZER == *s) { if ((r = spinlock_static_init(s))) return r; }}
 
 typedef struct spin_t spin_t;
 struct spin_t
 {
-  DWORD owner;
+  volatile DWORD owner;
+  volatile DWORD cur;
   unsigned int valid;
-  LONG l;
+  volatile LONG l;
 };
 
 #define LIFE_SPINLOCK 0xFEEDBAB1
@@ -55,8 +54,8 @@ union _vol_spinlock {
     volatile LONG *lv;
 };
 
-int _spin_lite_trylock(spin_t *l);
-int _spin_lite_unlock(spin_t *l);
-int _spin_lite_lock(spin_t *l);
+int _spin_lite_trylock (spin_t *l);
+int _spin_lite_unlock (spin_t *l);
+int _spin_lite_lock (spin_t *l);
 
 #endif

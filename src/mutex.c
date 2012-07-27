@@ -34,53 +34,52 @@ extern int do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout);
 static WINPTHREADS_ATTRIBUTE((noinline)) int mutex_static_init(pthread_mutex_t *m);
 static WINPTHREADS_ATTRIBUTE((noinline)) int _mutex_trylock(pthread_mutex_t *m);
 
-static spin_t mutex_global = {0,LIFE_SPINLOCK,1};
-static spin_t mutex_global_static = {0,LIFE_SPINLOCK,1};
+static spin_t mutex_global = {0, 0, LIFE_SPINLOCK,1};
+static spin_t mutex_global_static = {0, 0, LIFE_SPINLOCK,1};
 
 static WINPTHREADS_ATTRIBUTE((noinline)) int
 mutex_unref(pthread_mutex_t *m, int r)
 {
     mutex_t *m_ = (mutex_t *)*m;
-    _spin_lite_lock(&mutex_global);
+    _spin_lite_lock (&mutex_global);
 #ifdef WINPTHREAD_DBG
     assert((m_->valid == LIFE_MUTEX) && (m_->busy > 0));
 #endif
     m_->busy --;
-    _spin_lite_unlock(&mutex_global);
+    _spin_lite_unlock (&mutex_global);
     return r;
 }
 
 /* Set the mutex to busy in a thread-safe way */
 /* A busy mutex can't be destroyed */
 static WINPTHREADS_ATTRIBUTE((noinline)) int
-mutex_ref(pthread_mutex_t *m)
+mutex_ref (pthread_mutex_t *m)
 {
     int r = 0;
 
-    _spin_lite_lock(&mutex_global);
+    _spin_lite_lock (&mutex_global);
     if (!m || !*m)
     {
-      _spin_lite_unlock(&mutex_global);
+      _spin_lite_unlock (&mutex_global);
       return EINVAL;
     }
     if (STATIC_INITIALIZER(*m))
     {
-      _spin_lite_unlock(&mutex_global);
-      r = mutex_static_init(m);
-      _spin_lite_lock(&mutex_global);
+      _spin_lite_unlock (&mutex_global);
+      r = mutex_static_init (m);
+      _spin_lite_lock (&mutex_global);
       if (r != 0 && r != EBUSY)
       {
-	_spin_lite_unlock(&mutex_global);
+	_spin_lite_unlock (&mutex_global);
 	return r;
       }
     }
     r = 0;
     if (!m || !*m || ((mutex_t *)*m)->valid != LIFE_MUTEX) r = EINVAL;
-    else {
-        ((mutex_t *)*m)->busy ++;
-    }
+    else
+      ((mutex_t *)*m)->busy ++;
 
-    _spin_lite_unlock(&mutex_global);
+    _spin_lite_unlock (&mutex_global);
 
     return r;
 }
@@ -92,17 +91,15 @@ mutex_ref_unlock(pthread_mutex_t *m)
     int r = 0;
     mutex_t *m_ = (mutex_t *)*m;
 
-    _spin_lite_lock(&mutex_global);
+    _spin_lite_lock (&mutex_global);
 
     if (!m || !*m || ((mutex_t *)*m)->valid != LIFE_MUTEX) r = EINVAL;
-    else if (STATIC_INITIALIZER(*m) || !COND_LOCKED(m_)) {
-      r= EPERM;
-    }
-    else {
-        ((mutex_t *)*m)->busy ++;
-    }
+    else if (STATIC_INITIALIZER(*m) || !COND_LOCKED(m_))
+      r = EPERM;
+    else
+      ((mutex_t *)*m)->busy ++;
 
-    _spin_lite_unlock(&mutex_global);
+    _spin_lite_unlock (&mutex_global);
 
     return r;
 }
@@ -116,35 +113,38 @@ mutex_ref_destroy(pthread_mutex_t *m, pthread_mutex_t *mDestroy )
 
     *mDestroy = NULL;
     /* also considered as busy, any concurrent access prevents destruction: $$$$ */
-    if (_spin_lite_trylock(&mutex_global))
+    if (_spin_lite_trylock (&mutex_global) != 0)
       return EBUSY;
     
     if (!m || !*m)
         r = EINVAL;
-    else {
+    else
+    {
         mutex_t *m_ = (mutex_t *)*m;
         if (STATIC_INITIALIZER(*m)) *m = NULL;
         else if (m_->valid != LIFE_MUTEX) r = EINVAL;
         else if (m_->busy || COND_LOCKED(m_)) r = EBUSY;
-        else {
-            *mDestroy = *m;
-            *m = NULL;
+        else
+        {
+	  *mDestroy = *m;
+	  *m = NULL;
         }
     }
 
-    _spin_lite_unlock(&mutex_global);
+    _spin_lite_unlock (&mutex_global);
     return r;
 }
 
-static WINPTHREADS_ATTRIBUTE((noinline)) int mutex_ref_init(pthread_mutex_t *m )
+static WINPTHREADS_ATTRIBUTE((noinline)) int
+mutex_ref_init (pthread_mutex_t *m )
 {
     int r = 0;
 
-    _spin_lite_lock(&mutex_global);
+    _spin_lite_lock (&mutex_global);
     
     if (!m)  r = EINVAL;
  
-    _spin_lite_unlock(&mutex_global);
+    _spin_lite_unlock (&mutex_global);
     return r;
 }
 
@@ -175,18 +175,17 @@ void mutex_print(pthread_mutex_t *m, char *txt)
 #endif
 
 static WINPTHREADS_ATTRIBUTE((noinline)) int
-mutex_static_init(pthread_mutex_t *m)
+mutex_static_init (pthread_mutex_t *m)
 {
     static pthread_mutexattr_t mxattr_recursive = PTHREAD_MUTEX_RECURSIVE;
     static pthread_mutexattr_t mxattr_errorcheck = PTHREAD_MUTEX_ERRORCHECK;
 
     int r;
 
-    _spin_lite_lock(&mutex_global_static);
-    if (!STATIC_INITIALIZER(*m)) {
+    _spin_lite_lock (&mutex_global_static);
+    if (!STATIC_INITIALIZER(*m))
         /* Assume someone crept in between: */
         r = 0;
-    }
     else
     {
       if (*m == PTHREAD_MUTEX_INITIALIZER)
@@ -198,9 +197,9 @@ mutex_static_init(pthread_mutex_t *m)
       else if (*m == NULL)
 	r = EINVAL;
       else
-	r = pthread_mutex_init(m, NULL);
+	r = pthread_mutex_init (m, NULL);
     }
-    _spin_lite_unlock(&mutex_global_static);
+    _spin_lite_unlock (&mutex_global_static);
     return r;
 }
 
@@ -209,7 +208,7 @@ static int pthread_mutex_lock_intern(pthread_mutex_t *m, DWORD timeout);
 int
 pthread_mutex_lock (pthread_mutex_t *m)
 {
-  return pthread_mutex_lock_intern(m, INFINITE);
+  return pthread_mutex_lock_intern (m, INFINITE);
 }
 
 static int
@@ -344,7 +343,8 @@ int pthread_mutex_trylock(pthread_mutex_t *m)
     return mutex_unref(m,_mutex_trylock(m));
 }
 
-int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
+int
+pthread_mutex_init (pthread_mutex_t *m, const pthread_mutexattr_t *a)
 {
     mutex_t *_m;
 
