@@ -467,8 +467,8 @@ sizes.pass: sizes.exe
 
 benchtest%.exe: benchtest%.c $(HDR) $(QAPC)
 	@ $(ECHO) Compiling $@
-	@ $(ECHO) $(CC) $(CFLAGS) benchlib.o -o $@ $< $(INCLUDES) -L../outlib $(LINKAGEFLAG) -lsupc++ $(XXLIBS)
-	@ $(CC) $(CFLAGS) benchlib.o -o $@ $< $(INCLUDES) -L../outlib $(LINKAGEFLAG) -lsupc++ $(XXLIBS)
+	@ $(ECHO) $(CC) $(CFLAGS) -o $@ $< $(INCLUDES) -L../outlib $(LINKAGEFLAG) -lsupc++ $(XXLIBS)
+	@ $(CC) $(CFLAGS) -o $@ $< $(INCLUDES) -L../outlib $(LINKAGEFLAG) -lsupc++ $(XXLIBS)
 
 %.exe: %.c $(HDR) $(QAPC)
 	@ $(ECHO) Compiling $@

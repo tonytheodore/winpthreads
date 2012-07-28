@@ -144,18 +144,22 @@ int assertE;
  * gmtime(tm) and localtime(tm) return 0 if tm represents
  * a time prior to 1/1/1970.
  */
+#ifndef gmtime_r
 #define gmtime_r( _clock, _result ) \
         ( gmtime( (_clock) ) \
              ? (*(_result) = *gmtime( (_clock) ), (_result) ) \
              : (0) )
-
+#endif
+#ifndef localtime_r
 #define localtime_r( _clock, _result ) \
         ( localtime( (_clock) ) \
              ? (*(_result) = *localtime( (_clock) ), (_result) ) \
              : (0) )
-
+#endif
+#ifndef rand_r
 #define rand_r( _seed ) \
         ( _seed == _seed? rand() : rand() )
+#endif
 
 enum ptw32_features {
   PTW32_SYSTEM_INTERLOCKED_COMPARE_EXCHANGE = 0x0001, /* System provides it. */

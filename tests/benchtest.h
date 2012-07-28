@@ -32,8 +32,6 @@
  *
  */
 
-#include "../config.h"
-
 enum {
   OLD_WIN32CS,
   OLD_WIN32MUTEX
