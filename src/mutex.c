@@ -358,8 +358,8 @@ int pthread_mutex_unlock(pthread_mutex_t *m)
     if(InterlockedDecrement(&_m->count)) {
 #if 0
 	  printf("thread %d, mutex %p decreasing recursive\n", GetCurrentThreadId(), m);
-	  return mutex_unref(m,0);
 #endif
+	  return mutex_unref(m,0);
 	}
   }
 #if 0

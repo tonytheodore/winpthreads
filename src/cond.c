@@ -605,6 +605,7 @@ do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout)
   if (arr[1] != NULL) maxH += 1;
   if (maxH == 2)
   {
+redo:
       res = WaitForMultipleObjects(maxH, arr, 0, timeout);
       switch (res) {
       case WAIT_TIMEOUT:
@@ -613,8 +614,12 @@ do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout)
       case (WAIT_OBJECT_0 + 1):
           ResetEvent(arr[1]);
           if (nointerrupt != 2)
+	    {
             pthread_testcancel();
-          return EINVAL;
+            return EINVAL;
+	    }
+	  pthread_testcancel ();
+	  goto redo;
       case WAIT_ABANDONED:
 	  r = EPERM;
 	  break;
