@@ -627,7 +627,7 @@ do_sema_b_wait_intern (HANDLE sema, int nointerrupt, DWORD timeout)
       }
       if (r != 0 && r != EINVAL && WaitForSingleObject(arr[0], 0) == WAIT_OBJECT_0)
 	r = 0;
-      if (r != 0 && __pthread_shallcancel ())
+      if (r != 0 && nointerrupt != 2 && __pthread_shallcancel ())
 	return EINVAL;
       return r;
   }

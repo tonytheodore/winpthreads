@@ -1473,9 +1473,6 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
 	tv->sched.sched_priority = attr->param.sched_priority;
     }
 
-	if (tv->func == NULL) {
-		int lala = 3;
-	}
   /* Make sure tv->h has value of INVALID_HANDLE_VALUE */
   _ReadWriteBarrier();
 
