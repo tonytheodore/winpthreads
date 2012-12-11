@@ -648,79 +648,80 @@ pthread_once (pthread_once_t *o, void (*func)(void))
 int
 pthread_key_create (pthread_key_t *key, void (* dest)(void *))
 {
-  unsigned int i;
-  long nmax;
-  void (**d)(void *);
+	unsigned int i;
+	long nmax;
+	void (**d)(void *);
 
-  if (!key)
-    return EINVAL;
+	if (!key)
+		return EINVAL;
 
-  pthread_rwlock_wrlock (&_pthread_key_lock);
+	pthread_rwlock_wrlock (&_pthread_key_lock);
 
-  for (i = _pthread_key_sch; i < _pthread_key_max; i++)
-    {
-      if (!_pthread_key_dest[i])
+	for (i = _pthread_key_sch; i < _pthread_key_max; i++)
 	{
-	    *key = i;
-	    if (dest)
-	      _pthread_key_dest[i] = dest;
-	    else
-	      _pthread_key_dest[i] = (void(*)(void *))1;
-	    pthread_rwlock_unlock (&_pthread_key_lock);
-	    return 0;
+		if (!_pthread_key_dest[i])
+		{
+			*key = i;
+			if (dest)
+				_pthread_key_dest[i] = dest;
+			else
+				_pthread_key_dest[i] = (void(*)(void *))1;
+			pthread_rwlock_unlock (&_pthread_key_lock);
+			return 0;
+		}
 	}
-    }
 
-  for (i = 0; i < _pthread_key_sch; i++)
-    {
-      if (!_pthread_key_dest[i])
+	for (i = 0; i < _pthread_key_sch; i++)
 	{
-	  *key = i;
-	  if (dest)
-	    _pthread_key_dest[i] = dest;
-	  else
-	    _pthread_key_dest[i] = (void(*)(void *))1;
-	  pthread_rwlock_unlock (&_pthread_key_lock);
+		if (!_pthread_key_dest[i])
+		{
+			*key = i;
+			if (dest)
+				_pthread_key_dest[i] = dest;
+			else
+				_pthread_key_dest[i] = (void(*)(void *))1;
+			pthread_rwlock_unlock (&_pthread_key_lock);
 
-	  return 0;
+			return 0;
+		}
 	}
-    }
 
-    if (_pthread_key_max == PTHREAD_KEYS_MAX)
-      {
-        pthread_rwlock_unlock(&_pthread_key_lock);
-        return ENOMEM;
-      }
-    nmax = _pthread_key_max * 2;
-    if (nmax == 0)
-      nmax = _pthread_key_max + 1;
-    if (nmax > PTHREAD_KEYS_MAX)
-      nmax = PTHREAD_KEYS_MAX;
+	if (_pthread_key_max == PTHREAD_KEYS_MAX)
+	{
+		pthread_rwlock_unlock(&_pthread_key_lock);
+		return ENOMEM;
+	}
 
-    /* No spare room anywhere */
-    d = (void (__cdecl **)(void *))realloc(_pthread_key_dest, nmax * sizeof(*d));
-    if (!d)
-      {
-        pthread_rwlock_unlock (&_pthread_key_lock);
-        return ENOMEM;
-      }
+	nmax = _pthread_key_max * 2;
+	if (nmax == 0)
+		nmax = _pthread_key_max + 1;
+	if (nmax > PTHREAD_KEYS_MAX)
+		nmax = PTHREAD_KEYS_MAX;
 
-    /* Clear new region */
-    memset ((void *) &d[_pthread_key_max], 0, (nmax-_pthread_key_max)*sizeof(void *));
+	/* No spare room anywhere */
+	d = (void (__cdecl **)(void *))realloc(_pthread_key_dest, nmax * sizeof(*d));
+	if (!d)
+	{
+		pthread_rwlock_unlock (&_pthread_key_lock);
+		return ENOMEM;
+	}
 
-    /* Use new region */
-    _pthread_key_dest = d;
-    _pthread_key_sch = _pthread_key_max + 1;
-    *key = _pthread_key_max;
-    _pthread_key_max = nmax;
+	/* Clear new region */
+	memset ((void *) &d[_pthread_key_max], 0, (nmax-_pthread_key_max)*sizeof(void *));
 
-    if (dest)
-      _pthread_key_dest[*key] = dest;
-    else
-      _pthread_key_dest[*key] = (void(*)(void *))1;
+	/* Use new region */
+	_pthread_key_dest = d;
+	_pthread_key_sch = _pthread_key_max + 1;
+	*key = _pthread_key_max;
+	_pthread_key_max = nmax;
 
-    pthread_rwlock_unlock (&_pthread_key_lock);
-    return 0;
+	if (dest)
+		_pthread_key_dest[*key] = dest;
+	else
+		_pthread_key_dest[*key] = (void(*)(void *))1;
+
+	pthread_rwlock_unlock (&_pthread_key_lock);
+	return 0;
 }
 
 int
@@ -821,50 +822,50 @@ pthread_tls_init (void)
 void
 _pthread_cleanup_dest (pthread_t t)
 {
-  _pthread_v *tv;
-  unsigned int i, j;
+	_pthread_v *tv;
+	unsigned int i, j;
 
-  if (!t)
-    return;
-  tv = __pth_gpointer_locked (t);
-  if (!tv)
-    return;
+	if (!t)
+		return;
+	tv = __pth_gpointer_locked (t);
+	if (!tv)
+		return;
 
-  for (j = 0; j < PTHREAD_DESTRUCTOR_ITERATIONS; j++)
-    {
-      int flag = 0;
-
-      _spin_lite_lock (&tv->spin_keys);
-      for (i = 0; i < tv->keymax; i++)
+	for (j = 0; j < PTHREAD_DESTRUCTOR_ITERATIONS; j++)
 	{
-	  void *val = tv->keyval[i];
+		int flag = 0;
 
-	  if (tv->keyval_set[i])
-	    {
-	      pthread_rwlock_rdlock (&_pthread_key_lock);
-	      if ((uintptr_t) _pthread_key_dest[i] > 1)
+		_spin_lite_lock (&tv->spin_keys);
+		for (i = 0; i < tv->keymax; i++)
 		{
-		  /* Call destructor */
-		  tv->keyval[i] = NULL;
-		  tv->keyval_set[i] = 0;
-		  _spin_lite_unlock (&tv->spin_keys);
-		  _pthread_key_dest[i](val);
-		  _spin_lite_lock (&tv->spin_keys);
-		  flag = 1;
+			void *val = tv->keyval[i];
+
+			if (tv->keyval_set[i])
+			{
+				pthread_rwlock_rdlock (&_pthread_key_lock);
+				if ((uintptr_t) _pthread_key_dest[i] > 1)
+				{
+					/* Call destructor */
+					tv->keyval[i] = NULL;
+					tv->keyval_set[i] = 0;
+					_spin_lite_unlock (&tv->spin_keys);
+					_pthread_key_dest[i](val);
+					_spin_lite_lock (&tv->spin_keys);
+					flag = 1;
+				}
+				else
+				{
+					tv->keyval[i] = NULL;
+					tv->keyval_set[i] = 0;
+				}
+				pthread_rwlock_unlock(&_pthread_key_lock);
+			}
 		}
-	      else
-	        {
-		  tv->keyval[i] = NULL;
-		  tv->keyval_set[i] = 0;
-		}
-	      pthread_rwlock_unlock(&_pthread_key_lock);
-	    }
+		_spin_lite_unlock (&tv->spin_keys);
+		/* Nothing to do? */
+		if (!flag)
+			return;
 	}
-      _spin_lite_unlock (&tv->spin_keys);
-      /* Nothing to do? */
-      if (!flag)
-        return;
-    }
 }
 
 static _pthread_v *
@@ -1472,6 +1473,9 @@ pthread_create (pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *
 	tv->sched.sched_priority = attr->param.sched_priority;
     }
 
+	if (tv->func == NULL) {
+		int lala = 3;
+	}
   /* Make sure tv->h has value of INVALID_HANDLE_VALUE */
   _ReadWriteBarrier();
 
