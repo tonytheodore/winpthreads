@@ -12,7 +12,6 @@ clean-local:
 
 libwinpthread_la_CPPFLAGS = -I$(srcdir)/include -DIN_WINPTHREAD
 libwinpthread_la_LDFLAGS = -no-undefined -version-info 1:0:0 -L$(fakelibdir)
-# -export-symbols-regex '^(pthread|sem|sched)_' ?
 
 libwinpthread_la_SOURCES = \
   src/barrier.h  src/cond.h  src/misc.h  src/mutex.h  src/rwlock.h  src/spinlock.h  src/thread.h  src/ref.h  src/sem.h \
